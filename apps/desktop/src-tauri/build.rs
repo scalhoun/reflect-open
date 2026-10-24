@@ -9,10 +9,7 @@ fn main() {
             // Rust does not add the search path for Swift's @rpath async runtime.
             println!("cargo:rustc-link-arg=-Wl,-rpath,/usr/lib/swift");
         }
-        swift_rs::SwiftLinker::new("10.15")
-            .with_ios("16.0")
-            .with_package("ReflectSpeech", "apple-speech")
-            .link();
+        tauri_utils::build::link_apple_library("ReflectSpeech", "apple-speech");
     }
     tauri_build::build()
 }

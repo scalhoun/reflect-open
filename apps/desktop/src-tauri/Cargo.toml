@@ -173,7 +173,7 @@ dbus-secret-service-keyring-store = { workspace = true, features = ["crypto-rust
 tauri-build = { workspace = true }
 
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.build-dependencies]
-swift-rs = { workspace = true }
+tauri-utils = { workspace = true }
 
 [dev-dependencies]
 tauri = { workspace = true, features = ["test"] }

@@ -131,7 +131,8 @@ mod tests {
 
     #[test]
     fn native_availability_crosses_the_swift_async_bridge() {
-        let status = native::status("en-US").expect("Apple speech status must return through Swift");
+        let status =
+            native::status("en-US").expect("Apple speech status must return through Swift");
         assert!(status.available || status.message.is_some());
     }
 }

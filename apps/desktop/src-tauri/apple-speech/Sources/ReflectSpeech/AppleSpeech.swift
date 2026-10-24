@@ -8,6 +8,7 @@ private final class SpeechResponse: @unchecked Sendable {
 
 // Rust calls these functions on its blocking pool. Waiting here keeps Swift's
 // async model and result lifetimes inside Swift without blocking the UI thread.
+@available(macOS 26.0, iOS 26.0, *)
 private func speechResponse(
   _ operation: @escaping @Sendable () async throws -> [String: Any]
 ) -> UnsafeMutablePointer<CChar>? {
