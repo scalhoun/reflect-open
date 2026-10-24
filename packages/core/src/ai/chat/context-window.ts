@@ -109,7 +109,10 @@ export function fitToContextWindow(
 ): ModelMessage[] {
   const window = Math.min(options.contextWindow, PRACTICAL_WINDOW_CEILING)
   const budget = Math.floor(
-    (window - textTokens(options.systemPrompt) - TURN_RESERVE_TOKENS) * ESTIMATE_HEADROOM,
+    (window -
+      textTokens(options.systemPrompt) -
+      (window < TURN_RESERVE_TOKENS ? Math.floor(window * 0.4) : TURN_RESERVE_TOKENS)) *
+      ESTIMATE_HEADROOM,
   )
   if (totalTokens(messages) <= budget) {
     return messages

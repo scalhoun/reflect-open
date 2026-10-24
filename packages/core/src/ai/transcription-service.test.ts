@@ -10,6 +10,7 @@ import {
 import { isAppError } from '../errors.ts'
 import { APP_REVIEW_STUB_KEY } from './app-review-demo.ts'
 import { isTranscriptionOversize, isTranscriptionRejected } from './transcribe-http.ts'
+import { createTestIpcBridgeService, createTestPlatformService } from '../testing/index.ts'
 
 interface RecordedCall {
   url: string
@@ -52,7 +53,11 @@ function request(overrides: Partial<TranscriptionRequest> = {}): TranscriptionRe
  * Transcribes `request` with a service whose HTTP requests go to `fetchFn`.
  */
 function transcribe(fetchFn: typeof fetch, request: TranscriptionRequest): Promise<string> {
-  return createTranscriptionService({ http: { fetch: fetchFn } }).transcribe(request)
+  return createTranscriptionService({
+    http: { fetch: fetchFn },
+    ipc: createTestIpcBridgeService(),
+    platform: createTestPlatformService(),
+  }).transcribe(request)
 }
 
 describe('TranscriptionService (openai)', () => {
@@ -337,6 +342,8 @@ describe('App Review demo key', () => {
   it('answers the demo key with a canned transcript and no provider call', async () => {
     const calls: RecordedCall[] = []
     const service = createTranscriptionService({
+      ipc: createTestIpcBridgeService(),
+      platform: createTestPlatformService(),
       http: { fetch: recordingFetch(calls, () => jsonResponse(200, { text: 'never reached' })) },
     })
 
@@ -349,9 +356,42 @@ describe('App Review demo key', () => {
 
   it('gives no session transcript for every other key', () => {
     const service = createTranscriptionService({
+      ipc: createTestIpcBridgeService(),
+      platform: createTestPlatformService(),
       http: { fetch: recordingFetch([], () => jsonResponse(200, { text: 'never reached' })) },
     })
 
     expect(service.sessionTranscript('sk-live')).toBeNull()
+  })
+})
+
+describe('Apple transcription', () => {
+  it('passes a graph-relative file and generation through native IPC without an HTTP call', async () => {
+    const ipc = createTestIpcBridgeService({
+      commands: { apple_speech_transcribe: () => 'A local transcript.' },
+    })
+    const calls: RecordedCall[] = []
+    const service = createTranscriptionService({
+      ipc,
+      platform: createTestPlatformService(),
+      http: { fetch: recordingFetch(calls, () => jsonResponse(500, {})) },
+    })
+    const recording = { path: 'audio-memos/memo.m4a', generation: 7, locale: 'en-US' }
+
+    expect(await service.transcribeApple(recording)).toBe('A local transcript.')
+    expect(ipc.calls()).toEqual([{ command: 'apple_speech_transcribe', args: recording }])
+    expect(calls).toEqual([])
+  })
+
+  it('reports unavailable in a browser without attempting native IPC', async () => {
+    const ipc = createTestIpcBridgeService()
+    const service = createTranscriptionService({
+      ipc,
+      platform: createTestPlatformService({ isNativeShell: false }),
+      http: { fetch: recordingFetch([], () => jsonResponse(500, {})) },
+    })
+
+    expect(await service.appleStatus('en-US')).toMatchObject({ available: false, installed: false })
+    expect(ipc.calls()).toEqual([])
   })
 })

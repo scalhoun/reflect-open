@@ -1,4 +1,6 @@
 import type { LanguageModel } from '@reflect/modules/ai'
+import type { IpcBridgeService } from '../ipc/ipc-service.ts'
+import type { IdService } from '../ports/id-service.ts'
 import type { HttpService } from '../ports/http-service.ts'
 import type { AiProviderConfig } from '../settings/schema.ts'
 import { anthropicDirectBrowserAccessHeaders } from './anthropic-headers.ts'
@@ -45,6 +47,8 @@ export interface LanguageModelService {
 
 export interface LanguageModelServiceDeps {
   readonly http: HttpService
+  readonly ipc: IpcBridgeService
+  readonly id: IdService
   readonly sdk: AiSdkLoader
 }
 
@@ -64,6 +68,10 @@ class LanguageModelServiceImpl implements LanguageModelService {
       return createDemoModel()
     }
     switch (config.provider) {
+      case 'apple': {
+        const { createAppleLanguageModel } = await import('./apple-language-model.ts')
+        return await createAppleLanguageModel(this.#deps)
+      }
       case 'openai': {
         const { createOpenAI } = await sdk.openai()
         return createOpenAI({ apiKey, fetch: fetchFn })(config.model)

@@ -53,6 +53,8 @@ export const readNotesInput = z.object({
 export interface ReadNoteDeps {
   readNote: (path: string) => Promise<string>
   privacy: PrivacyService
+  /** Maximum body characters for a model with a smaller context window. */
+  maxContentChars?: number
 }
 
 /**
@@ -73,7 +75,8 @@ export function buildReadOneNote(deps: ReadNoteDeps) {
     }
     const parsed = parseNote({ path, source })
     const { body } = splitFrontmatter(source)
-    const truncated = body.length > MAX_NOTE_CONTENT_CHARS
+    const maxContentChars = deps.maxContentChars ?? MAX_NOTE_CONTENT_CHARS
+    const truncated = body.length > maxContentChars
     try {
       return {
         ok: true,
@@ -81,7 +84,7 @@ export function buildReadOneNote(deps: ReadNoteDeps) {
           path,
           isPrivate: parsed.frontmatter.private,
           title: parsed.title,
-          content: truncated ? body.slice(0, MAX_NOTE_CONTENT_CHARS) : body,
+          content: truncated ? body.slice(0, maxContentChars) : body,
           truncated,
         }),
       }

@@ -74,6 +74,13 @@ describe('estimateTokens', () => {
 })
 
 describe('fitToContextWindow', () => {
+  it('keeps short follow-up history on a 4096-token local model', () => {
+    const messages = [...turn(100, 100), { role: 'user' as const, content: 'What about the date?' }]
+    expect(
+      fitToContextWindow(messages, { contextWindow: 4096, systemPrompt: 's'.repeat(1200) }),
+    ).toBe(messages)
+  })
+
   it('passes an under-budget history through untouched', () => {
     const messages = [...turn(400, 400), ...turn(400, 400)]
     expect(fitToContextWindow(messages, { contextWindow: 1_000_000, systemPrompt: '' })).toBe(

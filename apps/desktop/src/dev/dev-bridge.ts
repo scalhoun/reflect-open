@@ -132,6 +132,19 @@ class DevBridgeImpl implements IpcBridge {
         return { localRoot: DEV_GRAPH_ROOT, icloudDocumentsRoot: null, icloudGraphRoots: [] }
       case 'mobile_storage_local':
         return DEV_GRAPH_ROOT
+      case 'apple_language_status':
+        return {
+          available: false,
+          contextWindow: 4096,
+          message:
+            'Apple local AI requires the native macOS or iPhone app with Apple Intelligence enabled.',
+        }
+      case 'mobile_folder_pick':
+      case 'mobile_folder_resolve':
+        return { path: null }
+      case 'mobile_folder_finish':
+      case 'mobile_folder_release':
+        return null
       case 'icloud_download_pending':
       case 'icloud_request_downloads':
         return 0

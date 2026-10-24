@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createTestClockService, type TestClockService } from '../testing/clock.ts'
+import { createTestSettingsService } from '../testing/settings.ts'
 import type { AudioRecorderSegment, AudioRecorderState } from './audio-recorder-service.ts'
 import { createWebAudioRecorder, type WebMediaDevices } from './web-audio-recorder.ts'
 
@@ -95,7 +96,12 @@ let clock: TestClockService
 let mediaDevices: FakeMediaDevices
 
 function createRecorder() {
-  return createWebAudioRecorder({ clock, mediaDevices, MediaRecorder: FakeMediaRecorder })
+  return createWebAudioRecorder({
+    clock,
+    settings: createTestSettingsService(),
+    mediaDevices,
+    MediaRecorder: FakeMediaRecorder,
+  })
 }
 
 beforeEach(() => {
@@ -126,7 +132,7 @@ describe('createWebAudioRecorder', () => {
     })
     expect(recorder.state()).toBe('recording')
     expect(recorder.stream()).not.toBeNull()
-    // WKWebView profile: webm unsupported, mp4 picked.
+    // A recorder that supports only MP4.
     expect(FakeMediaRecorder.instances[0]!.mimeType).toBe('audio/mp4')
 
     await clock.advance(3000)
@@ -154,6 +160,45 @@ describe('createWebAudioRecorder', () => {
     FakeMediaRecorder.supported = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4']
     await createRecorder().start(START_OPTIONS)
     expect(FakeMediaRecorder.instances[0]!.mimeType).toBe('audio/webm;codecs=opus')
+  })
+
+  it('records AAC for Apple transcription even when WebM is supported', async () => {
+    FakeMediaRecorder.supported = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4']
+    const settings = createTestSettingsService({ transcriptionEngine: 'apple' })
+    await settings.whenLoaded()
+    const recorder = createWebAudioRecorder({
+      clock,
+      settings,
+      mediaDevices,
+      MediaRecorder: FakeMediaRecorder,
+    })
+
+    await recorder.start(START_OPTIONS)
+
+    expect(FakeMediaRecorder.instances[0]!.mimeType).toBe('audio/mp4')
+    await clock.advance(1000)
+    expect((await recorder.stop())?.mimeType).toBe('audio/mp4')
+  })
+
+  it('requests an explicit AAC codec when the recorder supports it', async () => {
+    FakeMediaRecorder.supported = [
+      'audio/webm;codecs=opus',
+      'audio/mp4;codecs=mp4a.40.2',
+      'audio/mp4',
+    ]
+    const settings = createTestSettingsService({ transcriptionEngine: 'apple' })
+    await settings.whenLoaded()
+    const recorder = createWebAudioRecorder({
+      clock,
+      settings,
+      mediaDevices,
+      MediaRecorder: FakeMediaRecorder,
+    })
+
+    await recorder.start(START_OPTIONS)
+
+    expect(FakeMediaRecorder.instances[0]!.mimeType).toBe('audio/mp4;codecs=mp4a.40.2')
+    await recorder.cancel()
   })
 
   it('discards a sub-half-second recording as a misclick', async () => {
@@ -339,9 +384,19 @@ describe('createWebAudioRecorder', () => {
   it('is supported only with both MediaRecorder and getUserMedia', () => {
     expect(createRecorder().isSupported()).toBe(true)
     // Node has neither global.
-    expect(createWebAudioRecorder({ clock, MediaRecorder: FakeMediaRecorder }).isSupported()).toBe(
-      false,
-    )
-    expect(createWebAudioRecorder({ clock, mediaDevices }).isSupported()).toBe(false)
+    expect(
+      createWebAudioRecorder({
+        clock,
+        settings: createTestSettingsService(),
+        MediaRecorder: FakeMediaRecorder,
+      }).isSupported(),
+    ).toBe(false)
+    expect(
+      createWebAudioRecorder({
+        clock,
+        settings: createTestSettingsService(),
+        mediaDevices,
+      }).isSupported(),
+    ).toBe(false)
   })
 })

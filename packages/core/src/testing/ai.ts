@@ -15,9 +15,13 @@ import type {
 } from '../ai/page-describer-service.ts'
 import {
   createTranscriptionService,
+  type AppleSpeechStatus,
+  type AppleTranscriptionRequest,
   type TranscriptionRequest,
   type TranscriptionService,
 } from '../ai/transcription-service.ts'
+import { createTestIpcBridgeService } from './ipc.ts'
+import { createTestPlatformService } from './platform.ts'
 import type { AiProviderConfig } from '../settings/schema.ts'
 
 /**
@@ -231,7 +235,19 @@ export type TestTranscriptionSource =
   | string
   | ((request: TranscriptionRequest) => MaybePromise<string>)
 
+type TestAppleTranscriptionSource =
+  | string
+  | ((request: AppleTranscriptionRequest) => MaybePromise<string>)
+
 export interface TestTranscriptionService extends TranscriptionService {
+  /**
+   * Every on-device request, with no audio bytes or credentials.
+   */
+  appleCalls(): readonly AppleTranscriptionRequest[]
+  /**
+   * Change the result of subsequent local transcriptions.
+   */
+  setAppleResult(result: TestAppleTranscriptionSource): void
   /**
    * Every request passed to `transcribe()`, in order.
    */
@@ -244,12 +260,17 @@ export interface TestTranscriptionService extends TranscriptionService {
 
 class TestTranscriptionServiceImpl implements TestTranscriptionService {
   #source: TestTranscriptionSource
+  #appleSource: TestAppleTranscriptionSource
   readonly #log: TranscriptionRequest[] = []
+  readonly #appleLog: AppleTranscriptionRequest[] = []
   readonly #real: TranscriptionService
 
   constructor(result: TestTranscriptionSource) {
     this.#source = result
+    this.#appleSource = typeof result === 'string' ? result : ''
     this.#real = createTranscriptionService({
+      ipc: createTestIpcBridgeService(),
+      platform: createTestPlatformService(),
       http: {
         fetch: () => Promise.reject(new Error('The test transcription service has no network')),
       },
@@ -262,6 +283,24 @@ class TestTranscriptionServiceImpl implements TestTranscriptionService {
     return typeof source === 'function' ? await source(request) : source
   }
 
+  appleStatus(_locale: string): Promise<AppleSpeechStatus> {
+    return Promise.resolve({ available: true, installed: true, locales: ['en_US'], message: null })
+  }
+
+  async transcribeApple(request: AppleTranscriptionRequest): Promise<string> {
+    this.#appleLog.push(request)
+    const source = this.#appleSource
+    return typeof source === 'function' ? await source(request) : source
+  }
+
+  appleCalls(): readonly AppleTranscriptionRequest[] {
+    return [...this.#appleLog]
+  }
+
+  setAppleResult(result: TestAppleTranscriptionSource): void {
+    this.#appleSource = result
+  }
+
   sessionTranscript(apiKey: string): string | null {
     return this.#real.sessionTranscript(apiKey)
   }
@@ -272,6 +311,7 @@ class TestTranscriptionServiceImpl implements TestTranscriptionService {
 
   setResult(result: TestTranscriptionSource): void {
     this.#source = result
+    if (typeof result === 'string') this.#appleSource = result
   }
 }
 

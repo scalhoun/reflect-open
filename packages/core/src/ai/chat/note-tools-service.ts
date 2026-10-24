@@ -68,6 +68,8 @@ export interface BuildNoteToolsOptions {
    * The file generation of the graph session the tools read from.
    */
   generation: number
+  /** Limit retrieval batches and note bodies for on-device models. */
+  smallContext?: boolean
 }
 
 export interface SearchNotesOutput {
@@ -198,7 +200,11 @@ class NoteToolsServiceImpl implements NoteToolsService {
     const readNote = async (path: string): Promise<string> => {
       return await noteFile.read(path, options.generation)
     }
-    const readOneNote = buildReadOneNote({ readNote, privacy })
+    const readOneNote = buildReadOneNote({
+      readNote,
+      privacy,
+      ...(options.smallContext ? { maxContentChars: 1800 } : {}),
+    })
     const readOneAsset = buildReadOneAsset({
       readNote,
       assetReferences,
@@ -214,7 +220,7 @@ class NoteToolsServiceImpl implements NoteToolsService {
         inputSchema: searchNotesInput,
         execute: async ({ query, limit }): Promise<SearchNotesOutput> => {
           const hits = await retrieval.retrieve(query, {
-            limit: limit ?? DEFAULT_SEARCH_LIMIT,
+            limit: options.smallContext ? Math.min(limit ?? 3, 3) : (limit ?? DEFAULT_SEARCH_LIMIT),
             mode: searchMode,
             excludePrivateContent: true,
           })
@@ -234,7 +240,7 @@ class NoteToolsServiceImpl implements NoteToolsService {
             return { ok: false, tag, error: INVALID_TAG_ERROR }
           }
           const rows = await noteList.listRecentNotes({
-            limit: limit ?? DEFAULT_RECENT_LIMIT,
+            limit: options.smallContext ? Math.min(limit ?? 3, 3) : (limit ?? DEFAULT_RECENT_LIMIT),
             tag: tag ?? null,
           })
           return {
@@ -255,10 +261,11 @@ class NoteToolsServiceImpl implements NoteToolsService {
           const rows = await dailyNotes.listDailyNotes({
             start,
             end,
-            limit: MAX_DAILY_NOTE_DAYS + 1,
+            limit: (options.smallContext ? 5 : MAX_DAILY_NOTE_DAYS) + 1,
           })
-          const truncated = rows.length > MAX_DAILY_NOTE_DAYS
-          const kept = truncated ? rows.slice(0, MAX_DAILY_NOTE_DAYS) : rows
+          const maxDays = options.smallContext ? 5 : MAX_DAILY_NOTE_DAYS
+          const truncated = rows.length > maxDays
+          const kept = truncated ? rows.slice(0, maxDays) : rows
           return {
             days: await privacy.cloudSafeNoteListings(kept.map(listingCandidate)),
             truncated,

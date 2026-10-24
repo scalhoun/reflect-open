@@ -220,6 +220,16 @@ export const describeAssetsSchema = z.boolean().catch(true)
 export const transcriptionFormatSchema = z.boolean().catch(true)
 
 /**
+ * The audio memo engine. Apple keeps audio and transcripts on the device.
+ */
+export const transcriptionEngineSchema = z.enum(['cloud', 'apple']).catch('cloud')
+
+/**
+ * The spoken language used by Apple's on-device recognizer.
+ */
+export const transcriptionLanguageSchema = z.string().trim().min(1).max(64).catch('en-US')
+
+/**
  * Maximum stored transcription hint. `whisper-1` (the OpenAI fallback model)
  * reads only the last 224 prompt tokens, so a longer hint would be cut from
  * the front.
@@ -272,6 +282,11 @@ export const mobileStorageKindSchema = z.enum(['icloud', 'local']).catch('local'
  * Only read when `mobileStorage` is `'icloud'`. Mobile-only.
  */
 export const mobileGraphNameSchema = z.string().catch('')
+
+/**
+ * The mobile iCloud graph was selected through Files; its permission bookmark is stored natively.
+ */
+export const mobileStorageFolderSchema = z.boolean().catch(false)
 
 /**
  * Whether the Apple Contacts integration is on. Off by default — turning it
@@ -355,11 +370,12 @@ export const aiProviderIdSchema = z.enum([
   'google',
   'openrouter',
   'openai-compatible',
+  'apple',
 ])
 
 export type AiProviderId = z.infer<typeof aiProviderIdSchema>
 
-export type HostedAiProviderId = Exclude<AiProviderId, 'openai-compatible'>
+export type HostedAiProviderId = Exclude<AiProviderId, 'openai-compatible' | 'apple'>
 
 export const openAiCompatibleBaseUrlSchema = z
   .string()
@@ -413,11 +429,15 @@ export const aiProviderConfigSchema = z.discriminatedUnion('provider', [
   googleProviderConfigSchema,
   openRouterProviderConfigSchema,
   openAiCompatibleProviderConfigSchema,
+  aiProviderConfigBaseSchema.extend({ provider: z.literal('apple') }),
 ])
 
 export type AiProviderConfig = z.infer<typeof aiProviderConfigSchema>
 
-export type HostedAiProviderConfig = Exclude<AiProviderConfig, { provider: 'openai-compatible' }>
+export type HostedAiProviderConfig = Exclude<
+  AiProviderConfig,
+  { provider: 'openai-compatible' | 'apple' }
+>
 
 /**
  * The `aiProviders` entry AI features use by default. A dangling or null id
@@ -534,11 +554,14 @@ export const settingsSchema = z.looseObject({
   semanticSearchEnabled: semanticSearchEnabledSchema,
   describeAssets: describeAssetsSchema,
   transcriptionFormat: transcriptionFormatSchema,
+  transcriptionEngine: transcriptionEngineSchema,
+  transcriptionLanguage: transcriptionLanguageSchema,
   transcriptionPrompt: transcriptionPromptSchema,
   contactsEnabled: contactsEnabledSchema,
   mobileOnboarded: mobileOnboardedSchema,
   mobileStorage: mobileStorageKindSchema,
   mobileGraphName: mobileGraphNameSchema,
+  mobileStorageFolder: mobileStorageFolderSchema,
   theme: themePreferenceSchema,
   timeFormat: timeFormatSchema,
   dateFormat: dateFormatSchema,

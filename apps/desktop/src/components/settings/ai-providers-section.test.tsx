@@ -91,6 +91,23 @@ beforeEach(() => {
 })
 
 describe('AiProvidersSection', () => {
+  it('adds Apple without a key field or keychain secret', async () => {
+    await renderSection()
+    const dialog = await openDialog()
+    await dialog.getByRole('combobox', { name: 'Provider' }).click()
+    await page.getByRole('option', { name: 'Apple (on-device)' }).click()
+    await expect.element(dialog.getByText(/No API key. Runs on this device/)).toBeVisible()
+    await expect.element(dialog.getByLabelText('API key')).not.toBeInTheDocument()
+    await dialog.getByRole('button', { name: 'Add provider' }).click()
+    await vi.waitFor(() => expect(saved()).toHaveLength(1))
+    expect(lastSavedDoc().aiProviders[0]).toMatchObject({
+      provider: 'apple',
+      model: 'apple-system',
+      keyHint: '',
+    })
+    expect(secrets.snapshot()).toEqual({})
+  })
+
   it('lists configured providers with their key hint and default badge', async () => {
     stored = twoStoredModels()
     await renderSection()

@@ -1,5 +1,6 @@
 import { generateText } from '@reflect/modules/ai'
 import { describe, expect, it } from 'vitest'
+import { createTestIpcBridgeService, createTestIdService } from '../testing/index.ts'
 import type { AiProviderConfig } from '../settings/schema.ts'
 import {
   ANTHROPIC_DIRECT_BROWSER_ACCESS_HEADER,
@@ -14,6 +15,8 @@ import { createLanguageModelService, createLazyAiSdkLoader } from './language-mo
 async function languageModel(config: AiProviderConfig, apiKey: string, fetchFn: typeof fetch) {
   const service = createLanguageModelService({
     http: { fetch: fetchFn },
+    ipc: createTestIpcBridgeService(),
+    id: createTestIdService(),
     sdk: createLazyAiSdkLoader(),
   })
   return await service.create(config, apiKey)
@@ -275,6 +278,8 @@ describe('create with the App Review demo key', () => {
   it('answers the demo key with the demo model and never loads a provider SDK', async () => {
     const unexpected = () => Promise.reject(new Error('unexpected SDK load'))
     const service = createLanguageModelService({
+      ipc: createTestIpcBridgeService(),
+      id: createTestIdService(),
       http: { fetch: () => Promise.reject(new Error('unexpected fetch')) },
       sdk: {
         openai: unexpected,

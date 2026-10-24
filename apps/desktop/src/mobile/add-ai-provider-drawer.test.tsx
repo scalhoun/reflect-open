@@ -59,6 +59,21 @@ async function selectAnthropic(): Promise<void> {
 }
 
 describe('AddAiProviderDrawer', () => {
+  it('adds Apple without a key or a data-sharing consent checkbox', async () => {
+    await renderSheet()
+    await page.getByRole('combobox', { name: 'Provider' }).click()
+    await page.getByRole('option', { name: 'Apple (on-device)' }).click()
+    await expect.element(page.getByText(/No API key. Runs on this device/)).toBeVisible()
+    await expect.element(page.getByLabelText('API key')).not.toBeInTheDocument()
+    await expect.element(consentCheckbox()).not.toBeInTheDocument()
+    await page.getByRole('button', { name: 'Add provider' }).click()
+    await vi.waitFor(() => {
+      expect(onAdd).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: 'apple', model: 'apple-system', apiKey: '' }),
+      )
+    })
+  })
+
   it('verifies the key, hands the draft to onAdd, and closes', async () => {
     await renderSheet()
     keyValidation.setResult('valid')

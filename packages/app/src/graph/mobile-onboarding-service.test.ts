@@ -154,6 +154,79 @@ describe('MobileOnboardingService warm', () => {
   })
 })
 
+describe('MobileOnboardingService selected Files folder', () => {
+  it('opens an existing folder without an app iCloud container and commits permission after open', async () => {
+    const context = await bootFreshInstall({
+      storage: { localRoot: MOBILE_ROOT, icloudDocumentsRoot: null, icloudGraphRoots: [] },
+    })
+    context.storage.setSelectedFolder('/iCloud/Reflect')
+
+    await context.service.chooseFolder()
+
+    expect(context.opened).toEqual(['/iCloud/Reflect'])
+    expect(context.storage.createdGraphs()).toEqual([])
+    expect(context.storage.finishedSelections()).toEqual([true])
+    expect(context.settings.get()).toMatchObject({
+      mobileOnboarded: true,
+      mobileStorage: 'icloud',
+      mobileStorageFolder: true,
+      mobileGraphName: 'Reflect',
+    })
+    context.stop()
+  })
+
+  it('leaves onboarding and settings unchanged when the Files picker is cancelled', async () => {
+    const context = await bootFreshInstall()
+    await context.service.chooseFolder()
+    expect(context.opened).toEqual([])
+    expect(context.service.getState().needsOnboarding).toBe(true)
+    expect(context.settings.get().mobileOnboarded).toBe(false)
+    expect(context.storage.finishedSelections()).toEqual([])
+    context.stop()
+  })
+
+  it('discards a pending folder grant when its graph cannot open', async () => {
+    const context = await bootFreshInstall()
+    context.storage.setSelectedFolder('/iCloud/Reflect')
+    context.failures.open = true
+    await expect(context.service.chooseFolder()).rejects.toThrow('Couldn’t open your notes')
+    expect(context.storage.finishedSelections()).toEqual([false])
+    expect(context.settings.get().mobileStorageFolder).toBe(false)
+    expect(context.service.getState().needsOnboarding).toBe(true)
+    context.stop()
+  })
+
+  it('resolves the saved bookmark on launch instead of persisting an absolute folder path', async () => {
+    const context = setup({
+      settings: {
+        mobileOnboarded: true,
+        mobileStorage: 'icloud',
+        mobileStorageFolder: true,
+        mobileGraphName: 'Reflect',
+      },
+    })
+    vi.spyOn(context.storage, 'resolveFolder').mockResolvedValue('/new-provider-path/Reflect')
+    context.graphSession.attach()
+    const stop = context.service.boot()
+    await expect.poll(() => context.opened).toEqual(['/new-provider-path/Reflect'])
+    expect(context.storage.createdGraphs()).toEqual([])
+    expect(JSON.stringify(context.settings.get())).not.toContain('/new-provider-path/')
+    stop()
+  })
+
+  it('asks for folder access again if the saved bookmark is unavailable, without opening an empty local graph', async () => {
+    const context = setup({
+      settings: { mobileOnboarded: true, mobileStorage: 'icloud', mobileStorageFolder: true },
+    })
+    context.graphSession.attach()
+    const stop = context.service.boot()
+    await expect.poll(() => context.service.getState().needsOnboarding).toBe(true)
+    expect(context.opened).toEqual([])
+    expect(context.settings.get().mobileStorageFolder).toBe(true)
+    stop()
+  })
+})
+
 describe('MobileOnboardingService boot', () => {
   it('does nothing on desktop', async () => {
     const context = setup({ platform: { appPlatform: 'desktop' } })

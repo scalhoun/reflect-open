@@ -76,6 +76,9 @@ function openAiCompatibleProbe(input: ApiKeyValidationInput): KeyProbe | null {
 }
 
 function keyProbe(input: ApiKeyValidationInput): KeyProbe | null {
+  if (input.provider === 'apple') {
+    return null
+  }
   if (input.provider === 'openai-compatible') {
     return openAiCompatibleProbe(input)
   }
@@ -107,7 +110,7 @@ class AiKeyValidationServiceImpl implements AiKeyValidationService {
     // Providers know nothing about the App Review demo key, so a probe would
     // reject it; accept it here so it can be saved and reach the canned
     // transcription path.
-    if (input.apiKey === APP_REVIEW_STUB_KEY) {
+    if (input.provider === 'apple' || input.apiKey === APP_REVIEW_STUB_KEY) {
       return 'valid'
     }
     const probe = keyProbe(input)

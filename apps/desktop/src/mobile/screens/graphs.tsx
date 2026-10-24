@@ -1,6 +1,6 @@
 import { useState, type ReactElement } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Plus } from 'lucide-react'
+import { FolderOpen, Plus } from 'lucide-react'
 import { errorMessage, type MobileStorageKind } from '@reflect/core'
 import { InlineAlert } from '@/components/inline-alert.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
@@ -12,6 +12,7 @@ import { SettingsActionRow, SettingsGroup, SettingsSelectRow } from '@/mobile/se
 import { useGraph } from '@/providers/graph-provider.tsx'
 import { useRouter } from '@/routing/router.tsx'
 import { useCoreServices } from '@/services/services-provider.tsx'
+import { useSettings } from '@/providers/settings-provider.tsx'
 
 /**
  * The Graphs screen (route kind `graphs`) — the mobile graph switcher as an
@@ -26,7 +27,8 @@ import { useCoreServices } from '@/services/services-provider.tsx'
  */
 export function MobileGraphs(): ReactElement {
   const { back, canBack, navigate } = useRouter()
-  const { graph, completeOnboarding } = useGraph()
+  const { graph, completeOnboarding, chooseMobileFolder } = useGraph()
+  const { settings } = useSettings()
   const [pendingRoot, setPendingRoot] = useState<string | null>(null)
   const [switchError, setSwitchError] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
@@ -41,7 +43,11 @@ export function MobileGraphs(): ReactElement {
 
   const resolving = storage === undefined
   const icloudDocumentsRoot = storage?.icloudDocumentsRoot ?? null
-  const icloudGraphRoots = storage?.icloudGraphRoots ?? []
+  const containerGraphRoots = storage?.icloudGraphRoots ?? []
+  const icloudGraphRoots =
+    settings.mobileStorageFolder && graph !== null && !containerGraphRoots.includes(graph.root)
+      ? [graph.root, ...containerGraphRoots]
+      : containerGraphRoots
   const localRoot = storage?.localRoot ?? null
   const busy = pendingRoot !== null
 
@@ -86,7 +92,9 @@ export function MobileGraphs(): ReactElement {
               resolving
                 ? null
                 : icloudDocumentsRoot === null
-                  ? 'iCloud Drive isn’t available on this device.'
+                  ? settings.mobileStorageFolder
+                    ? 'Files manages syncing for your selected folder.'
+                    : 'Choose your iCloud Drive folder through Files.'
                   : 'Syncs with Reflect on your other devices.'
             }
           >
@@ -115,6 +123,18 @@ export function MobileGraphs(): ReactElement {
                     onPress={() => setCreateOpen(true)}
                   />
                 ) : null}
+                <SettingsActionRow
+                  label="Choose an existing notes folder"
+                  icon={FolderOpen}
+                  disabled={busy}
+                  onPress={() => {
+                    setPendingRoot('folder')
+                    setSwitchError(null)
+                    void chooseMobileFolder()
+                      .catch((cause: unknown) => setSwitchError(errorMessage(cause)))
+                      .finally(() => setPendingRoot(null))
+                  }}
+                />
               </>
             )}
           </SettingsGroup>

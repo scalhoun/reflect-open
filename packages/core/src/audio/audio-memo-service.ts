@@ -107,7 +107,7 @@ export interface AudioMemoPipelineState {
    */
   readonly transcribing: boolean
   /**
-   * False when no OpenAI/Gemini model is configured.
+   * False when neither Apple transcription nor a cloud transcription model is configured.
    */
   readonly hasTranscriptionConfig: boolean
   /**
@@ -230,7 +230,7 @@ export interface AudioMemoSessionState {
    */
   readonly pendingCount: number
   /**
-   * False when no OpenAI/Gemini model is configured or the platform can't record.
+   * False when no transcription engine is configured or the platform can't record.
    */
   readonly available: boolean
   /**
@@ -337,7 +337,8 @@ export interface AudioMemoService {
   openSession(options: AudioMemoSessionOptions): AudioMemoSession
 }
 
-const NO_PROVIDER_REASON = 'Add an OpenAI or Gemini model in Settings to record audio memos'
+const NO_PROVIDER_REASON =
+  'Choose Apple transcription or add an OpenAI or Gemini model in Settings to record audio memos'
 const UNSUPPORTED_REASON = 'Audio recording is not supported on this platform'
 
 /**
@@ -363,6 +364,7 @@ function micDeniedMessage(platform: PlatformFacts): string {
 }
 
 interface AudioMemoPipelineDeps {
+  readonly settings: SettingsService
   readonly aiProviderConfig: AiProviderConfigService
   readonly progress: ProgressPort
   readonly logger: LoggerService
@@ -411,7 +413,9 @@ class AudioMemoPipelineImpl implements AudioMemoPipeline {
     this.#deps = deps
     this.#generation = generation
     this.#isErrorSurfaceVisible = options.isErrorSurfaceVisible
-    this.#hasTranscriptionConfig = aiProviderConfig.transcriptionConfig() !== null
+    this.#hasTranscriptionConfig =
+      deps.settings.get().transcriptionEngine === 'apple' ||
+      aiProviderConfig.transcriptionConfig() !== null
     // One lifecycle per graph session. It owns the launch pass and all retry
     // triggers; the pump only schedules. Main window only.
     this.#reconciler = deps.reconciler
@@ -426,7 +430,9 @@ class AudioMemoPipelineImpl implements AudioMemoPipeline {
     // first key mid-session, kick the pass that gate was suppressing.
     this.#stopConfig = aiProviderConfig.subscribe(() => {
       const hadConfig = this.#hasTranscriptionConfig
-      this.#hasTranscriptionConfig = aiProviderConfig.transcriptionConfig() !== null
+      this.#hasTranscriptionConfig =
+        deps.settings.get().transcriptionEngine === 'apple' ||
+        aiProviderConfig.transcriptionConfig() !== null
       if (this.#hasTranscriptionConfig && !hadConfig) {
         this.#reconciler?.schedule()
       }
@@ -936,11 +942,13 @@ class AudioMemoServiceImpl implements AudioMemoService {
   }
 
   openPipeline(options: AudioMemoPipelineOptions): AudioMemoPipeline {
-    const { aiProviderConfig, progress, logger, noteFile, assetStore, graphSession } = this.#deps
+    const { aiProviderConfig, settings, progress, logger, noteFile, assetStore, graphSession } =
+      this.#deps
     const { generation } = requireGraphSession(graphSession)
     return new AudioMemoPipelineImpl(
       {
         aiProviderConfig,
+        settings,
         progress,
         logger,
         noteFile,

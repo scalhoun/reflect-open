@@ -63,6 +63,7 @@ describe('AI_PROVIDERS', () => {
           'openai/gpt-5.6-sol',
         ],
       },
+      { id: 'apple', models: ['apple-system'] },
       {
         id: 'openai-compatible',
         models: ['local-model'],
@@ -75,7 +76,7 @@ describe('modelContextWindow', () => {
   it('resolves catalog ids and falls back for unknown ones', () => {
     for (const provider of AI_PROVIDERS) {
       for (const model of provider.models) {
-        expect(model.contextWindow).toBeGreaterThanOrEqual(100_000)
+        expect(model.contextWindow).toBeGreaterThanOrEqual(provider.id === 'apple' ? 4096 : 100_000)
         expect(modelContextWindow(provider.id, model.id)).toBe(model.contextWindow)
       }
     }

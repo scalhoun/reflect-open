@@ -1,10 +1,9 @@
 import { useState, type ReactElement } from 'react'
-import { Cloud, HardDrive } from 'lucide-react'
+import { Cloud, FolderOpen, HardDrive } from 'lucide-react'
 import { InlineAlert } from '@/components/inline-alert.tsx'
 import { Button } from '@/components/ui/button.tsx'
 import { Spinner } from '@/components/ui/spinner.tsx'
 import { useAsyncAction } from '@/hooks/use-async-action.ts'
-import { OnboardingIcloudHeader } from '@/mobile/onboarding-icloud-header.tsx'
 import { OnboardingIcloudSection } from '@/mobile/onboarding-icloud-section.tsx'
 import { useGraph } from '@/providers/graph-provider.tsx'
 
@@ -32,7 +31,8 @@ type PendingChoice = string | null
  * once the lookup finished.
  */
 export function MobileOnboardingScreen(): ReactElement {
-  const { mobileStorageInfo, mobileStorageResolving, completeOnboarding } = useGraph()
+  const { mobileStorageInfo, mobileStorageResolving, completeOnboarding, chooseMobileFolder } =
+    useGraph()
   const action = useAsyncAction()
   const [pendingChoice, setPendingChoice] = useState<PendingChoice>(null)
 
@@ -66,6 +66,24 @@ export function MobileOnboardingScreen(): ReactElement {
         </header>
 
         <div className="flex flex-col gap-4">
+          <section className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
+            <h2 className="text-base font-semibold">Open your notes folder</h2>
+            <p className="text-sm leading-6 text-text-secondary">
+              Choose the same Reflect folder you open on your Mac. Files can grant access to your
+              iCloud Drive folder.
+            </p>
+            <Button
+              disabled={action.pending}
+              onClick={() => runChoice('folder', chooseMobileFolder)}
+            >
+              {pendingChoice === 'folder' ? (
+                <Spinner />
+              ) : (
+                <FolderOpen aria-hidden strokeWidth={1.75} />
+              )}
+              Choose an existing notes folder
+            </Button>
+          </section>
           {icloudReady || icloudPending ? (
             <OnboardingIcloudSection
               pending={icloudPending}
@@ -78,9 +96,7 @@ export function MobileOnboardingScreen(): ReactElement {
                 runChoice('icloud-create', () => completeOnboarding('icloud', root))
               }}
             />
-          ) : (
-            <IcloudUnavailableSection />
-          )}
+          ) : null}
 
           <div className="flex flex-col items-center gap-1 px-4 text-center">
             <Button
@@ -103,16 +119,5 @@ export function MobileOnboardingScreen(): ReactElement {
         {action.error !== null ? <InlineAlert tone="error">{action.error}</InlineAlert> : null}
       </div>
     </div>
-  )
-}
-
-function IcloudUnavailableSection(): ReactElement {
-  return (
-    <section className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
-      <OnboardingIcloudHeader description="Turn on iCloud Drive to keep your notes synced between devices." />
-      <p className="rounded-lg bg-muted/60 px-3 py-2 text-xs leading-5 text-text-muted">
-        Sign in to iCloud on this device, then reopen Reflect.
-      </p>
-    </section>
   )
 }

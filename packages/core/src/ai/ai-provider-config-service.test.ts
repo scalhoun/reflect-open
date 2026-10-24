@@ -56,6 +56,24 @@ async function createService(
 }
 
 describe('AiProviderConfigService', () => {
+  it('adds Apple with no keychain entry, discarding a key left over from another provider', async () => {
+    const { service, secretStore } = await createService()
+    const checked = await service.checkDraft(
+      draft({ provider: 'apple', model: 'apple-system', apiKey: 'stale-key' }),
+      { unverified: false },
+    )
+    expect(checked.status).toBe('ready')
+    if (checked.status !== 'ready') throw new Error('Apple provider was rejected')
+    expect(checked.draft.apiKey).toBe('')
+    await service.add(checked.draft)
+    expect(secretStore.snapshot()).toEqual({})
+    expect(service.chatModel()).toMatchObject({
+      provider: 'apple',
+      model: 'apple-system',
+      keyHint: '',
+    })
+  })
+
   it('lists the entries and resolves the default one', async () => {
     const { service } = await createService({ aiProviders: [A, B], defaultAiProviderId: 'b' })
 

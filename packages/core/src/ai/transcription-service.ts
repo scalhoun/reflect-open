@@ -1,5 +1,7 @@
 import { z } from 'zod'
 import type { HttpService } from '../ports/http-service.ts'
+import type { IpcBridgeService } from '../ipc/ipc-service.ts'
+import type { PlatformFacts } from '../ports/platform-facts.ts'
 import { bytesToBase64 } from '@reflect/utils'
 import { AppError } from '../errors.ts'
 import { APP_REVIEW_STUB_KEY, stubTranscriptBody } from './app-review-demo.ts'
@@ -66,12 +68,43 @@ export interface TranscriptionRequest {
 
 export interface TranscriptionServiceDeps {
   readonly http: HttpService
+  readonly ipc: IpcBridgeService
+  readonly platform: PlatformFacts
+}
+
+const appleSpeechStatusSchema = z.object({
+  available: z.boolean(),
+  installed: z.boolean(),
+  locales: z.array(z.string()),
+  message: z.string().nullable(),
+})
+
+/**
+ * Device and language support, including whether the local model is installed.
+ */
+export type AppleSpeechStatus = z.infer<typeof appleSpeechStatusSchema>
+
+/**
+ * A durable graph recording to transcribe without moving its bytes through JavaScript.
+ */
+export interface AppleTranscriptionRequest {
+  readonly path: string
+  readonly generation: number
+  readonly locale: string
 }
 
 /**
  * Speech to text for one recording.
  */
 export interface TranscriptionService {
+  /**
+   * Inspect Apple's recognizer without downloading models or requesting permissions.
+   */
+  appleStatus(locale: string): Promise<AppleSpeechStatus>
+  /**
+   * Transcribe a saved recording locally, downloading the language model if needed.
+   */
+  transcribeApple(request: AppleTranscriptionRequest): Promise<string>
   /**
    * Transcribe one recording, returning the trimmed transcript (empty when the
    * provider heard nothing). Throws {@link AppError}: `auth` when the key is
@@ -90,9 +123,28 @@ export interface TranscriptionService {
 
 class TranscriptionServiceImpl implements TranscriptionService {
   readonly #fetch: typeof fetch
+  readonly #deps: TranscriptionServiceDeps
 
   constructor(deps: TranscriptionServiceDeps) {
+    this.#deps = deps
     this.#fetch = (input, init) => deps.http.fetch(input, init)
+  }
+
+  async appleStatus(locale: string): Promise<AppleSpeechStatus> {
+    const { platform, ipc } = this.#deps
+    if (!platform.isNativeShell || !['darwin', 'ios'].includes(platform.buildPlatform ?? '')) {
+      return {
+        available: false,
+        installed: false,
+        locales: [],
+        message: 'Apple transcription requires the native app on macOS 26 or iOS 26.',
+      }
+    }
+    return await ipc.call('apple_speech_status', { locale }, appleSpeechStatusSchema)
+  }
+
+  async transcribeApple(request: AppleTranscriptionRequest): Promise<string> {
+    return await this.#deps.ipc.call('apple_speech_transcribe', { ...request }, z.string())
   }
 
   async transcribe(request: TranscriptionRequest): Promise<string> {

@@ -65,6 +65,7 @@ export function AddAiProviderForm({ onAdd, onClose }: AddAiProviderFormProps): R
   const selectedModel = useWatch({ control, name: 'model' })
   const baseUrlValue = useWatch({ control, name: 'baseUrl' })
   const provider = aiProvider(providerId)
+  const isApple = provider.id === 'apple'
   const isOpenAICompatible = provider.id === 'openai-compatible'
   const apiKeyRequired = aiProviderRequiresApiKey(provider.id)
 
@@ -174,28 +175,37 @@ export function AddAiProviderForm({ onAdd, onClose }: AddAiProviderFormProps): R
         </label>
       ) : null}
 
-      <label className="flex flex-col gap-1">
-        <span className={FIELD_LABEL_CLASS}>
-          {apiKeyRequired ? 'API key' : 'API key (optional)'}
-        </span>
-        <Input
-          type="password"
-          placeholder={provider.keyPlaceholder}
-          autoComplete="off"
-          spellCheck={false}
-          {...register('apiKey', {
-            validate: (value) => !apiKeyRequired || value.trim().length > 0 || 'Enter an API key.',
-            onChange: () => {
-              resetUnverified()
-            },
-          })}
-        />
-        {formState.errors.apiKey ? (
-          <span role="alert" className="text-xs text-red-600 dark:text-red-400">
-            {formState.errors.apiKey.message}
+      {isApple ? (
+        <p className="text-sm text-text-muted">
+          No API key. Runs on this device with Apple Intelligence enabled. Requires macOS 26.4 or
+          iOS 26.4 or later. Best for short questions about a few notes.
+        </p>
+      ) : (
+        <label className="flex flex-col gap-1">
+          <span className={FIELD_LABEL_CLASS}>
+            {apiKeyRequired ? 'API key' : 'API key (optional)'}
           </span>
-        ) : null}
-      </label>
+          <Input
+            type="password"
+            placeholder={provider.keyPlaceholder}
+            autoComplete="off"
+            spellCheck={false}
+            {...register('apiKey', {
+              validate: (value) => {
+                return !apiKeyRequired || value.trim().length > 0 || 'Enter an API key.'
+              },
+              onChange: () => {
+                resetUnverified()
+              },
+            })}
+          />
+          {formState.errors.apiKey ? (
+            <span role="alert" className="text-xs text-red-600 dark:text-red-400">
+              {formState.errors.apiKey.message}
+            </span>
+          ) : null}
+        </label>
+      )}
 
       <label className="flex items-center gap-2">
         <input type="checkbox" className="accent-accent" {...register('isDefault')} />

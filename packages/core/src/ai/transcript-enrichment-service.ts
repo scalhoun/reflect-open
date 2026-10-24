@@ -56,6 +56,7 @@ export function audioMemoEnrichmentConfig(config: AiProviderConfig): AiProviderC
     case 'google':
       return { ...config, model: GOOGLE_AUDIO_MEMO_ENRICHMENT_MODEL }
     case 'openrouter':
+    case 'apple':
       return null
     case 'openai-compatible':
       return config

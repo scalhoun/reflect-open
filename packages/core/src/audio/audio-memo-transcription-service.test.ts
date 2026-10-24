@@ -33,6 +33,77 @@ afterEach(() => {
 })
 
 describe('AudioMemoTranscriptionService.reconcile', () => {
+  it('transcribes locally without providers, credentials, audio bytes in JavaScript, or cloud enrichment', async () => {
+    const kit = await createAudioMemoTestKit({ providers: NO_PROVIDERS })
+    kit.settings.update({ transcriptionEngine: 'apple', transcriptionLanguage: 'en-GB' })
+    kit.addRecording(MEMO.audioPath)
+
+    expect(await kit.reconcile()).toEqual(DONE)
+    expect(kit.transcription.appleCalls()).toEqual([
+      { path: MEMO.audioPath, generation: 3, locale: 'en-GB' },
+    ])
+    expect(kit.transcription.calls()).toEqual([])
+    expect(kit.getSecretMock).not.toHaveBeenCalled()
+    expect(kit.readBytesMock).not.toHaveBeenCalled()
+    expect(kit.enrichMock).toHaveBeenCalledWith(
+      expect.objectContaining({ enrichmentCredentials: null }),
+    )
+    expect(await kit.noteFile.read(MEMO.notePath, 3)).toContain('memo transcript')
+  })
+
+  it('keeps Apple transcripts local even when cloud models and auto-format are configured', async () => {
+    const kit = await createAudioMemoTestKit()
+    kit.settings.update({ transcriptionEngine: 'apple' })
+    kit.addRecording(MEMO.audioPath)
+
+    expect(await kit.reconcile({ formatTranscript: true })).toEqual(DONE)
+    expect(kit.getSecretMock).not.toHaveBeenCalled()
+    expect(kit.transcription.calls()).toEqual([])
+    expect(kit.enrichMock).toHaveBeenCalledWith(
+      expect.objectContaining({ enrichmentCredentials: null }),
+    )
+  })
+
+  it('leaves failed Apple recordings pending for retry without switching to a cloud provider', async () => {
+    const kit = await createAudioMemoTestKit()
+    kit.settings.update({ transcriptionEngine: 'apple' })
+    kit.addRecording(MEMO.audioPath)
+    vi.spyOn(kit.transcription, 'transcribeApple').mockRejectedValue(
+      new AppError('io', 'Model unavailable'),
+    )
+
+    expect(await kit.reconcile()).toEqual({
+      pending: 1,
+      transcribed: 0,
+      rejected: 0,
+      stopped: { reason: 'io', message: 'Model unavailable' },
+    })
+    expect(kit.transcription.calls()).toEqual([])
+    expect(kit.getSecretMock).not.toHaveBeenCalled()
+    expect(kit.noteFile.files().has(MEMO.notePath)).toBe(false)
+  })
+
+  it('does not cache or write a local transcript returned after its graph session ends', async () => {
+    const kit = await createAudioMemoTestKit({ providers: NO_PROVIDERS })
+    kit.settings.update({ transcriptionEngine: 'apple' })
+    kit.addRecording(MEMO.audioPath)
+    const started = Promise.withResolvers<void>()
+    const pending = Promise.withResolvers<string>()
+    kit.transcription.setAppleResult(() => {
+      started.resolve()
+      return pending.promise
+    })
+    let stale = false
+    const pass = kit.reconcile({ isStale: () => stale })
+    await started.promise
+    stale = true
+    pending.resolve('Late transcript')
+
+    expect((await pass).stopped?.reason).toBe('stale')
+    expect(kit.noteFile.files().has(MEMO.notePath)).toBe(false)
+    expect(kit.enrichMock).not.toHaveBeenCalled()
+  })
+
   it('does nothing when every memo already has its transcription note', async () => {
     const kit = await createAudioMemoTestKit()
     kit.addRecording(MEMO.audioPath)

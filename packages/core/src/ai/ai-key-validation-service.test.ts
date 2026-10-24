@@ -21,6 +21,12 @@ function fetchReturning(status: number): typeof fetch {
 const fetchThrowing: typeof fetch = () => Promise.reject(new TypeError('network down'))
 
 describe('AiKeyValidationService', () => {
+  it('accepts the keyless Apple provider without any HTTP probe', async () => {
+    const http = createTestHttpService()
+    expect(await validateApiKey({ provider: 'apple', apiKey: '' }, http.fetchFn)).toBe('valid')
+    expect(http.requests()).toEqual([])
+  })
+
   it('sends the provider-specific auth headers to the model-listing endpoint', async () => {
     const http = createTestHttpService()
 

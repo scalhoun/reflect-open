@@ -129,6 +129,8 @@ class ChatEngineServiceImpl implements ChatEngineService {
 
   async *streamTurn(request: ChatTurnRequest): AsyncGenerator<ChatStreamEvent> {
     const { logger, languageModel, noteTools, fitToContextWindow } = this.#deps
+    const semanticSearchEnabled =
+      request.config.provider !== 'apple' && request.semanticSearchEnabled
     try {
       request.signal?.throwIfAborted()
       const messages = fitToContextWindow(request.messages, {
@@ -136,7 +138,7 @@ class ChatEngineServiceImpl implements ChatEngineService {
         systemPrompt: chatSystemPrompt({
           today: request.today,
           context: request.context,
-          semanticSearchEnabled: request.semanticSearchEnabled,
+          semanticSearchEnabled,
           customSystemPrompt: request.customSystemPrompt,
         }),
       })
@@ -145,13 +147,15 @@ class ChatEngineServiceImpl implements ChatEngineService {
       yield* streamChatTurn({ logger }, model, {
         messages,
         today: request.today,
-        semanticSearchEnabled: request.semanticSearchEnabled,
+        semanticSearchEnabled,
         customSystemPrompt: request.customSystemPrompt,
         context: request.context,
         signal: request.signal,
+        ...(request.config.provider === 'apple' ? { maxSteps: 4 } : {}),
         tools: noteTools.build({
-          semanticSearchEnabled: request.semanticSearchEnabled,
+          semanticSearchEnabled,
           generation: request.generation,
+          ...(request.config.provider === 'apple' ? { smallContext: true } : {}),
         }),
       })
     } catch (cause) {
@@ -170,6 +174,9 @@ export function createChatEngineService(deps: ChatEngineServiceDeps): ChatEngine
  * {@link streamChatTurn}'s options: {@link ChatTurnRequest} minus provider wiring, plus the tools.
  */
 export interface ChatTurnOptions {
+  /** Fewer retrieval rounds for models with a small context window. */
+  maxSteps?: number
+
   /**
    * Full model-facing history including the new user message.
    */
@@ -228,6 +235,7 @@ export async function* streamChatTurn(
   try {
     const { isStepCount, streamText } = await import('@reflect/modules/ai')
     options.signal?.throwIfAborted()
+    const maxSteps = options.maxSteps ?? MAX_STEPS
     const result = streamText({
       model,
       instructions: chatSystemPrompt({
@@ -238,13 +246,13 @@ export async function* streamChatTurn(
       }),
       messages: options.messages,
       tools: options.tools,
-      stopWhen: isStepCount(MAX_STEPS),
+      stopWhen: isStepCount(maxSteps),
       // On the final permitted step, disable tools so the model must answer
       // from what it has already gathered. Without this a turn still calling
       // tools when the ceiling fires ends on a tool result with no reply — the
       // user sees tool activity, then silence. `stepNumber` counts completed
       // steps, so the last step that runs is `MAX_STEPS - 1`.
-      prepareStep: ({ stepNumber }) => (stepNumber >= MAX_STEPS - 1 ? { toolChoice: 'none' } : {}),
+      prepareStep: ({ stepNumber }) => (stepNumber >= maxSteps - 1 ? { toolChoice: 'none' } : {}),
       ...(options.signal !== undefined ? { abortSignal: options.signal } : {}),
       // `step.response.messages` holds only the messages that step created,
       // so the running history is accumulated here rather than assigned.

@@ -481,6 +481,10 @@ export interface CoreServices {
    */
   readonly audioMemo: AudioMemoService
   /**
+   * Cloud and on-device speech recognition, including Apple model availability.
+   */
+  readonly transcription: TranscriptionService
+  /**
    * Generates managed Markdown descriptions of eligible image and PDF assets, and folds them into search.
    */
   readonly assetDescription: AssetDescriptionService
@@ -885,6 +889,7 @@ export function composeCoreServices(
     logger,
   })
   const audioRecorder = create.audioRecorder({
+    settings,
     platform: adapters.platform,
     ipc,
     clock,
@@ -938,7 +943,12 @@ export function composeCoreServices(
   const xArchive = create.xArchive({ ipc })
   const aiCredentials = create.aiCredentials({ secretStore })
   const aiKeyValidation = create.aiKeyValidation({ http: adapters.http })
-  const languageModel = create.languageModel({ http: adapters.http, sdk: createLazyAiSdkLoader() })
+  const languageModel = create.languageModel({
+    http: adapters.http,
+    ipc,
+    id,
+    sdk: createLazyAiSdkLoader(),
+  })
   const aiProviderConfig = create.aiProviderConfig({
     settings,
     credentials: aiCredentials,
@@ -1071,7 +1081,7 @@ export function composeCoreServices(
     logger,
     clock,
   })
-  const transcription = create.transcription({ http: adapters.http })
+  const transcription = create.transcription({ http: adapters.http, ipc, platform })
   const transcriptEnrichment = create.transcriptEnrichment({ languageModel })
   const audioMemo = create.audioMemo({
     assetStore,
@@ -1352,6 +1362,7 @@ export function composeCoreServices(
       logger,
     }),
     audioMemo,
+    transcription,
     assetDescription: create.assetDescription({
       assetStore,
       noteFile,
