@@ -20,6 +20,7 @@ const STORAGE: MobileStorageInfo = {
 }
 
 let completeOnboarding: MockInstance<MobileOnboardingService['completeOnboarding']>
+let chooseFolder: MockInstance<MobileOnboardingService['chooseFolder']>
 
 /**
  * Render the first-run screen on the mobile platform, with the choice observed by the spy.
@@ -35,6 +36,7 @@ async function mount(options?: {
     mobileStorage: createTestMobileStorageService({ storage }),
   })
   const appServices = createTestAppServices(app)
+  chooseFolder = vi.spyOn(appServices.mobileOnboarding, 'chooseFolder').mockResolvedValue()
   completeOnboarding = vi
     .spyOn(appServices.mobileOnboarding, 'completeOnboarding')
     .mockImplementation(async () => {})
@@ -47,6 +49,14 @@ async function mount(options?: {
 }
 
 describe('MobileOnboardingScreen', () => {
+  it('opens the native Files choice without requiring an app iCloud container', async () => {
+    await mount({
+      storage: { localRoot: '/Documents', icloudDocumentsRoot: null, icloudGraphRoots: [] },
+    })
+    await page.getByRole('button', { name: 'Choose an existing notes folder' }).click()
+    expect(chooseFolder).toHaveBeenCalledOnce()
+    expect(completeOnboarding).not.toHaveBeenCalled()
+  })
   it('leads with iCloud sync and creates the named iCloud notes', async () => {
     await mount()
 
@@ -134,20 +144,15 @@ describe('MobileOnboardingScreen', () => {
       .toBeEnabled()
   })
 
-  it('keeps the iCloud recommendation visible when iCloud is unavailable', async () => {
+  it('offers a Files folder without telling an entitled-out build to sign in again', async () => {
     await mount({
       storage: { localRoot: '/Documents', icloudDocumentsRoot: null, icloudGraphRoots: [] },
     })
 
     await expect
-      .element(page.getByRole('heading', { name: 'iCloud sync', exact: true }))
+      .element(page.getByRole('button', { name: 'Choose an existing notes folder' }))
       .toBeVisible()
-    await expect
-      .element(page.getByText('Turn on iCloud Drive to keep your notes synced between devices.'))
-      .toBeVisible()
-    await expect
-      .element(page.getByText('Sign in to iCloud on this device, then reopen Reflect.'))
-      .toBeVisible()
+    expect(page.getByText(/Sign in to iCloud/).query()).toBeNull()
     await expect
       .element(page.getByRole('button', { name: 'Or, use this device only' }))
       .toBeVisible()
@@ -161,9 +166,11 @@ describe('MobileOnboardingScreen', () => {
     expect(page.getByRole('button', { name: 'Download & open' }).query()).toBeNull()
   })
 
-  it('does not expose folder language in the primary first-run path', async () => {
+  it('offers the existing notes folder as a first-run choice', async () => {
     await mount()
 
-    expect(page.getByText(/folder/i).query()).toBeNull()
+    await expect
+      .element(page.getByRole('heading', { name: 'Open your notes folder' }))
+      .toBeVisible()
   })
 })

@@ -173,7 +173,7 @@ class AiProviderConfigServiceImpl implements AiProviderConfigService {
       )
     }
     const id = idService.uuid()
-    const apiKey = draft.apiKey.trim()
+    const apiKey = draft.provider === 'apple' ? '' : draft.apiKey.trim()
     if (apiKey !== '' || aiProviderRequiresApiKey(draft.provider)) {
       await credentials.store(id, apiKey)
     }
@@ -240,7 +240,7 @@ class AiProviderConfigServiceImpl implements AiProviderConfigService {
     draft: NewAiProvider,
     options: { unverified: boolean },
   ): Promise<AiProviderDraftCheck> {
-    const apiKey = draft.apiKey.trim()
+    const apiKey = draft.provider === 'apple' ? '' : draft.apiKey.trim()
     const requiresApiKey = aiProviderRequiresApiKey(draft.provider)
     const provider = aiProvider(draft.provider)
     const baseUrl =

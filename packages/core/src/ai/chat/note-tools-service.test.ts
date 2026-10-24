@@ -47,6 +47,7 @@ interface ToolEffects {
   assetReferencingNotePathsFn?: (assetPath: string, owners?: readonly string[]) => Promise<string[]>
   xArchiveOwners?: Readonly<Record<string, readonly string[]>>
   semanticSearchEnabled?: boolean
+  smallContext?: boolean
 }
 
 /**
@@ -86,7 +87,11 @@ function buildNoteTools(effects: ToolEffects = {}): NoteTools {
       noteFile,
       graphSession: createTestGraphSessionService({ graph: { generation: 1 } }),
     }),
-  }).build({ semanticSearchEnabled: effects.semanticSearchEnabled ?? true, generation: 1 })
+  }).build({
+    semanticSearchEnabled: effects.semanticSearchEnabled ?? true,
+    generation: 1,
+    ...(effects.smallContext === undefined ? {} : { smallContext: effects.smallContext }),
+  })
 }
 
 const CALL: ToolExecutionOptions<Record<string, unknown>> = {
@@ -734,5 +739,29 @@ describe('list_daily_notes', () => {
     const output = await runDailies(tools, { start: '2026-06-01', end: '2026-06-30' })
     expect(output.days).toEqual([])
     expect(JSON.stringify(output)).not.toContain(PRIVATE_TITLE)
+  })
+})
+
+describe('small-context note tools', () => {
+  it('bounds public note text and still refuses live private notes', async () => {
+    const tools = buildNoteTools({
+      smallContext: true,
+      readNoteFn: (path) => {
+        return Promise.resolve(
+          path.includes('private')
+            ? '---\nprivate: true\n---\n' + PRIVATE_BODY
+            : '# Public note\n' + 'text '.repeat(1000),
+        )
+      },
+    })
+    const output = await tools.read_notes.execute(
+      { paths: ['notes/public.md', 'notes/private.md'] },
+      CALL,
+    )
+    expect(output.notes[0]).toMatchObject({ ok: true, note: { truncated: true } })
+    const first = output.notes[0]
+    if (first?.ok) expect(first.note.content).toHaveLength(1800)
+    expect(output.notes[1]).toMatchObject({ ok: false })
+    expect(JSON.stringify(output)).not.toContain(PRIVATE_BODY)
   })
 })

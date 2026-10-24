@@ -943,7 +943,12 @@ export function composeCoreServices(
   const xArchive = create.xArchive({ ipc })
   const aiCredentials = create.aiCredentials({ secretStore })
   const aiKeyValidation = create.aiKeyValidation({ http: adapters.http })
-  const languageModel = create.languageModel({ http: adapters.http, sdk: createLazyAiSdkLoader() })
+  const languageModel = create.languageModel({
+    http: adapters.http,
+    ipc,
+    id,
+    sdk: createLazyAiSdkLoader(),
+  })
   const aiProviderConfig = create.aiProviderConfig({
     settings,
     credentials: aiCredentials,

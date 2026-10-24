@@ -81,7 +81,7 @@ describe('MobileGraphs', () => {
     await mount()
 
     await expect
-      .element(page.getByRole('button', { name: 'Notes' }))
+      .element(page.getByRole('button', { name: 'Notes', exact: true }))
       .toHaveAttribute('aria-current', 'true')
 
     await userEvent.click(page.getByRole('button', { name: 'Work' }))
@@ -93,7 +93,7 @@ describe('MobileGraphs', () => {
   it('ignores a tap on the graph that is already open', async () => {
     await mount()
 
-    await userEvent.click(page.getByRole('button', { name: 'Notes' }))
+    await userEvent.click(page.getByRole('button', { name: 'Notes', exact: true }))
     expect(completeOnboarding).not.toHaveBeenCalled()
   })
 
@@ -139,7 +139,9 @@ describe('MobileGraphs', () => {
   it('says so when iCloud Drive is unavailable', async () => {
     await mount({ localRoot: '/Documents', icloudDocumentsRoot: null, icloudGraphRoots: [] })
 
-    await expect.element(page.getByText(/iCloud Drive isn’t available/)).toBeVisible()
+    await expect
+      .element(page.getByText('Choose your iCloud Drive folder through Files.'))
+      .toBeVisible()
     await expect.element(page.getByRole('button', { name: 'New graph' })).not.toBeInTheDocument()
   })
 })

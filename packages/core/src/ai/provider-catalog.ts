@@ -133,6 +133,13 @@ export const AI_PROVIDERS: NonEmptyArray<AiProviderInfo> = [
     ],
   },
   {
+    id: 'apple',
+    label: 'Apple (on-device)',
+    apiKeyRequired: false,
+    keyPlaceholder: '',
+    models: [{ id: 'apple-system', label: 'Apple Intelligence', contextWindow: 4096 }],
+  },
+  {
     id: 'openai-compatible',
     label: 'OpenAI-compatible',
     apiKeyRequired: false,

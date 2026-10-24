@@ -33,6 +33,22 @@ export type MobileStorageKind = 'icloud' | 'local'
  */
 export interface MobileStorageService {
   /**
+   * Ask the user for a notes folder in Files, holding a pending scoped grant.
+   */
+  pickFolder(): Promise<string | null>
+  /**
+   * Restore the previously committed folder grant, resolving its current path.
+   */
+  resolveFolder(): Promise<string | null>
+  /**
+   * Keep the pending grant after a successful open, or discard it after cancellation/failure.
+   */
+  finishFolderSelection(commit: boolean): Promise<void>
+  /**
+   * Stop accessing a selected folder after switching to built-in storage.
+   */
+  releaseFolder(): Promise<void>
+  /**
    * Resolve every mobile storage root. Mobile only; the desktop shell rejects it.
    */
   resolve(): Promise<MobileStorageInfo>
@@ -56,6 +72,32 @@ class MobileStorageServiceImpl implements MobileStorageService {
 
   constructor(deps: MobileStorageServiceDeps) {
     this.#deps = deps
+  }
+
+  async pickFolder(): Promise<string | null> {
+    const result = await this.#deps.ipc.call(
+      'mobile_folder_pick',
+      {},
+      z.object({ path: z.string().nullable() }),
+    )
+    return result.path
+  }
+
+  async resolveFolder(): Promise<string | null> {
+    const result = await this.#deps.ipc.call(
+      'mobile_folder_resolve',
+      {},
+      z.object({ path: z.string().nullable() }),
+    )
+    return result.path
+  }
+
+  async finishFolderSelection(commit: boolean): Promise<void> {
+    await this.#deps.ipc.call('mobile_folder_finish', { commit }, z.null())
+  }
+
+  async releaseFolder(): Promise<void> {
+    await this.#deps.ipc.call('mobile_folder_release', {}, z.null())
   }
 
   resolve(): Promise<MobileStorageInfo> {

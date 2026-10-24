@@ -479,36 +479,40 @@ describe('streamChatTurn', () => {
     expect(outbound).toContain('call-2')
   })
 
-  it('disables tools on the final step so a tool-bound turn still answers', async () => {
-    // Every gathering step calls a tool; the model only writes its answer
-    // once tools are disabled on the last permitted step. Without that force,
-    // the turn would end on a tool result with no reply.
-    const gathering = Array.from({ length: MAX_STEPS - 1 }, (_unused, index) => {
-      return toolCallTurn(`query-${index}`, `call-${index}`)
-    })
-    const model = new MockLanguageModelV3({
-      doStream: sequence([...gathering, textTurn('Summary: [[Atlas Launch Plan]]')]),
-    })
-    const events = await collect(
-      streamChatTurn({ logger }, model, {
-        messages: [{ role: 'user', content: 'summarize everything' }],
-        today: '2026-06-11',
-        semanticSearchEnabled: true,
-        customSystemPrompt: '',
-        context: null,
-        tools: tools({
-          retrieveFn: () => Promise.resolve([PUBLIC_HIT]),
-          readNoteFn: () => Promise.resolve('body\n'),
+  it.each([MAX_STEPS, 4])(
+    'disables tools on the final step with a %i-step budget',
+    async (maxSteps) => {
+      // Every gathering step calls a tool; the model only writes its answer
+      // once tools are disabled on the last permitted step. Without that force,
+      // the turn would end on a tool result with no reply.
+      const gathering = Array.from({ length: maxSteps - 1 }, (_unused, index) => {
+        return toolCallTurn(`query-${index}`, `call-${index}`)
+      })
+      const model = new MockLanguageModelV3({
+        doStream: sequence([...gathering, textTurn('Summary: [[Atlas Launch Plan]]')]),
+      })
+      const events = await collect(
+        streamChatTurn({ logger }, model, {
+          maxSteps,
+          messages: [{ role: 'user', content: 'summarize everything' }],
+          today: '2026-06-11',
+          semanticSearchEnabled: true,
+          customSystemPrompt: '',
+          context: null,
+          tools: tools({
+            retrieveFn: () => Promise.resolve([PUBLIC_HIT]),
+            readNoteFn: () => Promise.resolve('body\n'),
+          }),
         }),
-      }),
-    )
+      )
 
-    // Every step ran, gathering steps kept tools on, and the final step was
-    // forced to answer rather than call another tool.
-    expect(model.doStreamCalls.length).toBe(MAX_STEPS)
-    expect(model.doStreamCalls[0]?.toolChoice).toEqual({ type: 'auto' })
-    expect(model.doStreamCalls.at(-1)?.toolChoice).toEqual({ type: 'none' })
-    expect(events.at(-1)?.type).toBe('complete')
-    expect(events.some((event) => event.type === 'text-delta')).toBe(true)
-  })
+      // Every step ran, gathering steps kept tools on, and the final step was
+      // forced to answer rather than call another tool.
+      expect(model.doStreamCalls.length).toBe(maxSteps)
+      expect(model.doStreamCalls[0]?.toolChoice).toEqual({ type: 'auto' })
+      expect(model.doStreamCalls.at(-1)?.toolChoice).toEqual({ type: 'none' })
+      expect(events.at(-1)?.type).toBe('complete')
+      expect(events.some((event) => event.type === 'text-delta')).toBe(true)
+    },
+  )
 })

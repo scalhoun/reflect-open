@@ -14,6 +14,7 @@
 //! [`menu`] (the macOS app menu, incl. Paste and Match Style),
 //! [`error`] (the shared error contract).
 
+mod apple_language_model;
 mod apple_speech;
 mod background_task;
 mod blocking;
@@ -273,11 +274,18 @@ pub fn run() {
             fs::x_archive::x_archive_owners,
             fs::x_syndication::x_syndication_fetch,
             app_version,
+            apple_language_model::apple_language_status,
+            apple_language_model::apple_language_generate,
+            apple_language_model::apple_language_cancel,
             apple_speech::apple_speech_status,
             apple_speech::apple_speech_transcribe,
             background_task::background_task_begin,
             background_task::background_task_end,
             icloud::storage::mobile_storage,
+            icloud::folder::mobile_folder_pick,
+            icloud::folder::mobile_folder_resolve,
+            icloud::folder::mobile_folder_finish,
+            icloud::folder::mobile_folder_release,
             icloud::storage::mobile_storage_local,
             icloud::storage::icloud_download_pending,
             icloud::storage::icloud_pending_count,

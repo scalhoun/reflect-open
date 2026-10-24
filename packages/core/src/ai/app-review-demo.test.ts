@@ -6,6 +6,8 @@ import type { AiProviderConfig } from '../settings/schema.ts'
 import { APP_REVIEW_STUB_KEY, createDemoModel, DEMO_REPLY_TEXT } from './app-review-demo.ts'
 import {
   createNodeTestDatabaseService,
+  createTestIpcBridgeService,
+  createTestIdService,
   createTestHttpService,
   createTestLoggerService,
   createTestNoteFileService,
@@ -58,7 +60,12 @@ describe('createDemoModel', () => {
     const assetReferences = { notePaths: () => [] }
     const engine = createChatEngineService({
       logger: createTestLoggerService(),
-      languageModel: createLanguageModelService({ http, sdk: createLazyAiSdkLoader() }),
+      languageModel: createLanguageModelService({
+        http,
+        ipc: createTestIpcBridgeService(),
+        id: createTestIdService(),
+        sdk: createLazyAiSdkLoader(),
+      }),
       noteTools: createNoteToolsService({
         retrieval: createTestRetrievalService(),
         noteFile,

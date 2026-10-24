@@ -45,6 +45,10 @@ export interface MobileGraphBoot {
    * root opens.
    */
   completeOnboarding: (kind: MobileStorageKind, root?: string) => Promise<void>
+  /**
+   * Choose and open a notes folder through Files.
+   */
+  chooseMobileFolder: () => Promise<void>
 }
 
 /**
@@ -65,6 +69,7 @@ export function useMobileGraphBoot(): MobileGraphBoot {
       mobileStorageResolving: state.resolving,
       mobileStorageKind: state.kind,
       completeOnboarding: (...args) => service.completeOnboarding(...args),
+      chooseMobileFolder: () => service.chooseFolder(),
     }),
     [state, service],
   )

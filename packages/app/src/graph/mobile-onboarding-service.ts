@@ -97,6 +97,10 @@ export interface MobileOnboardingState {
  * function properties so surfaces can pass them around unbound.
  */
 export interface MobileOnboardingService {
+  /**
+   * Open an existing notes folder selected through the system Files picker.
+   */
+  chooseFolder(): Promise<void>
   getState: () => MobileOnboardingState
   subscribe: (listener: () => void) => Unlisten
   /**
@@ -317,6 +321,24 @@ class MobileOnboardingServiceImpl implements MobileOnboardingService {
             return
           }
           const kind = settings.mobileStorage
+          if (kind === 'icloud' && settings.mobileStorageFolder) {
+            resolveStorageInBackground()
+            try {
+              const root = await mobileStorage.resolveFolder()
+              if (!active) return
+              if (root === null)
+                throw new Error('Choose your notes folder again to restore access.')
+              this.#setState({ kind: 'icloud' })
+              const opened = await graphSession.openRecent(root)
+              if (!opened) throw new Error('Couldn’t reopen your selected notes folder.')
+            } catch (cause) {
+              if (active) {
+                this.#setState({ needsOnboarding: true })
+                graphSession.park(errorMessage(cause))
+              }
+            }
+            return
+          }
           if (kind === 'local') {
             // The sandbox graph needs no container: open it right away and
             // let the full storage info (the settings switcher reads it)
@@ -369,6 +391,25 @@ class MobileOnboardingServiceImpl implements MobileOnboardingService {
   }
 
   async completeOnboarding(kind: MobileStorageKind, chosenRoot?: string): Promise<void> {
+    await this.#completeChoice(kind, chosenRoot, false)
+  }
+
+  async chooseFolder(): Promise<void> {
+    const root = await this.#deps.mobileStorage.pickFolder()
+    if (root === null) return
+    try {
+      await this.#completeChoice('icloud', root, true)
+    } catch (cause) {
+      await this.#deps.mobileStorage.finishFolderSelection(false)
+      throw cause
+    }
+  }
+
+  async #completeChoice(
+    kind: MobileStorageKind,
+    chosenRoot: string | undefined,
+    pickedFolder: boolean,
+  ): Promise<void> {
     const { mobileStorage, settings: settingsService, graphSession } = this.#deps
     const storageInfo = this.#state.storageInfo
     // An explicit root comes from the onboarding graph list or the settings
@@ -384,7 +425,7 @@ class MobileOnboardingServiceImpl implements MobileOnboardingService {
       )
     }
     const shouldCreateIcloudRoot =
-      kind === 'icloud' && storageInfo?.icloudGraphRoots.includes(root) !== true
+      kind === 'icloud' && !pickedFolder && storageInfo?.icloudGraphRoots.includes(root) !== true
     if (shouldCreateIcloudRoot) {
       await mobileStorage.createGraph(root)
     }
@@ -398,6 +439,11 @@ class MobileOnboardingServiceImpl implements MobileOnboardingService {
     if (!opened) {
       throw new Error('Couldn’t open your notes — please try again.')
     }
+    if (pickedFolder) {
+      await mobileStorage.finishFolderSelection(true)
+    } else {
+      await mobileStorage.releaseFolder()
+    }
     this.#setState({ kind, needsOnboarding: false })
     // Persist the flags only once the graph is actually open, so a failed open
     // never strands the user past onboarding. Await hydration first — the
@@ -408,6 +454,7 @@ class MobileOnboardingServiceImpl implements MobileOnboardingService {
     settingsService.update({
       mobileOnboarded: true,
       mobileStorage: kind,
+      mobileStorageFolder: pickedFolder,
       // The container can hold several graphs — remember WHICH one by name
       // (never by path; container paths change across restore/update).
       mobileGraphName: kind === 'icloud' ? graphNameFromRoot(root) : '',

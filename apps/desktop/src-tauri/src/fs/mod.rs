@@ -181,7 +181,10 @@ pub async fn note_read(
 ) -> AppResult<String> {
     let root = root_for(&state, generation)?;
     let abs = resolve(&root, &path)?;
-    crate::blocking::run_blocking(move || Ok(io::read_note_no_follow(&root, &abs)?)).await
+    crate::blocking::run_blocking(move || {
+        crate::icloud::folder::coordinate_read(&abs, || Ok(io::read_note_no_follow(&root, &abs)?))
+    })
+    .await
 }
 
 /// Read a note's markdown **only when its bytes are local**. Bulk background
@@ -250,14 +253,17 @@ pub fn note_write(
     state: State<GraphState>,
 ) -> AppResult<NoteWriteOutcome> {
     let root = root_for_generation(&state, generation)?;
-    let outcome = write_note_revision(
-        &root,
-        &path,
-        &contents,
-        check_contents == Some(true),
-        expected_contents.as_deref(),
-        || root_for_generation(&state, generation).map(drop),
-    )?;
+    let target = resolve(&root, &path)?;
+    let outcome = crate::icloud::folder::coordinate_write(&target, || {
+        write_note_revision(
+            &root,
+            &path,
+            &contents,
+            check_contents == Some(true),
+            expected_contents.as_deref(),
+            || root_for_generation(&state, generation).map(drop),
+        )
+    })?;
     invalidate_file_catalog(&state, &root);
     Ok(outcome)
 }

@@ -284,6 +284,11 @@ export const mobileStorageKindSchema = z.enum(['icloud', 'local']).catch('local'
 export const mobileGraphNameSchema = z.string().catch('')
 
 /**
+ * The mobile iCloud graph was selected through Files; its permission bookmark is stored natively.
+ */
+export const mobileStorageFolderSchema = z.boolean().catch(false)
+
+/**
  * Whether the Apple Contacts integration is on. Off by default — turning it
  * on triggers the OS contacts permission prompt. Lookups are live, on-demand
  * `CNContactStore` queries (attendee resolution, suggested-contact cards);
@@ -365,11 +370,12 @@ export const aiProviderIdSchema = z.enum([
   'google',
   'openrouter',
   'openai-compatible',
+  'apple',
 ])
 
 export type AiProviderId = z.infer<typeof aiProviderIdSchema>
 
-export type HostedAiProviderId = Exclude<AiProviderId, 'openai-compatible'>
+export type HostedAiProviderId = Exclude<AiProviderId, 'openai-compatible' | 'apple'>
 
 export const openAiCompatibleBaseUrlSchema = z
   .string()
@@ -423,11 +429,15 @@ export const aiProviderConfigSchema = z.discriminatedUnion('provider', [
   googleProviderConfigSchema,
   openRouterProviderConfigSchema,
   openAiCompatibleProviderConfigSchema,
+  aiProviderConfigBaseSchema.extend({ provider: z.literal('apple') }),
 ])
 
 export type AiProviderConfig = z.infer<typeof aiProviderConfigSchema>
 
-export type HostedAiProviderConfig = Exclude<AiProviderConfig, { provider: 'openai-compatible' }>
+export type HostedAiProviderConfig = Exclude<
+  AiProviderConfig,
+  { provider: 'openai-compatible' | 'apple' }
+>
 
 /**
  * The `aiProviders` entry AI features use by default. A dangling or null id
@@ -551,6 +561,7 @@ export const settingsSchema = z.looseObject({
   mobileOnboarded: mobileOnboardedSchema,
   mobileStorage: mobileStorageKindSchema,
   mobileGraphName: mobileGraphNameSchema,
+  mobileStorageFolder: mobileStorageFolderSchema,
   theme: themePreferenceSchema,
   timeFormat: timeFormatSchema,
   dateFormat: dateFormatSchema,

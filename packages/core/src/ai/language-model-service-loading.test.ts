@@ -1,6 +1,10 @@
 import { expect, it } from 'vitest'
 import type { AiProviderConfig } from '../settings/schema.ts'
-import { createTestHttpService } from '../testing/index.ts'
+import {
+  createTestHttpService,
+  createTestIpcBridgeService,
+  createTestIdService,
+} from '../testing/index.ts'
 import { APP_REVIEW_STUB_KEY } from './app-review-demo.ts'
 import {
   createLanguageModelService,
@@ -30,7 +34,12 @@ it('loads no SDK for demo mode, then only each selected implementation', async (
     },
   }
   const http = createTestHttpService()
-  const languageModel = createLanguageModelService({ http, sdk })
+  const languageModel = createLanguageModelService({
+    http,
+    sdk,
+    ipc: createTestIpcBridgeService(),
+    id: createTestIdService(),
+  })
   const config: AiProviderConfig = {
     id: 'cfg',
     provider: 'openai',

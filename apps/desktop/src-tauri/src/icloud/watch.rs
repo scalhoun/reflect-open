@@ -145,10 +145,12 @@ mod platform {
     use objc2::{MainThreadMarker, msg_send};
     use objc2_foundation::{
         NSArray, NSCopying, NSDate, NSMetadataItem, NSMetadataItemFSContentChangeDateKey,
-        NSMetadataItemPathKey, NSMetadataQuery, NSMetadataQueryDidFinishGatheringNotification,
-        NSMetadataQueryDidUpdateNotification, NSMetadataQueryUbiquitousDocumentsScope,
-        NSMetadataQueryUpdateAddedItemsKey, NSMetadataQueryUpdateChangedItemsKey,
-        NSMetadataQueryUpdateRemovedItemsKey, NSMetadataUbiquitousItemDownloadingStatusCurrent,
+        NSMetadataItemPathKey, NSMetadataQuery,
+        NSMetadataQueryAccessibleUbiquitousExternalDocumentsScope,
+        NSMetadataQueryDidFinishGatheringNotification, NSMetadataQueryDidUpdateNotification,
+        NSMetadataQueryUbiquitousDocumentsScope, NSMetadataQueryUpdateAddedItemsKey,
+        NSMetadataQueryUpdateChangedItemsKey, NSMetadataQueryUpdateRemovedItemsKey,
+        NSMetadataUbiquitousItemDownloadingStatusCurrent,
         NSMetadataUbiquitousItemDownloadingStatusKey,
         NSMetadataUbiquitousItemHasUnresolvedConflictsKey, NSNotification, NSNotificationCenter,
         NSNumber, NSOperationQueue, NSPredicate, NSString,
@@ -332,7 +334,9 @@ mod platform {
         query.setNotificationBatchingInterval(UPDATE_BATCHING_INTERVAL_S);
 
         let scope: Retained<NSString> = unsafe { NSMetadataQueryUbiquitousDocumentsScope.copy() };
-        let scopes = NSArray::from_retained_slice(&[scope]);
+        let external: Retained<NSString> =
+            unsafe { NSMetadataQueryAccessibleUbiquitousExternalDocumentsScope.copy() };
+        let scopes = NSArray::from_retained_slice(&[scope, external]);
         // setSearchScopes/argumentArray take untyped NSArrays the bindings
         // can't coerce typed arrays into — message directly.
         unsafe {

@@ -76,6 +76,7 @@ function AddAiProviderSheet({
     onDone: onClose,
   })
   const provider = aiProvider(providerId)
+  const isApple = provider.id === 'apple'
   const isOpenAICompatible = provider.id === 'openai-compatible'
   const apiKeyRequired = aiProviderRequiresApiKey(provider.id)
 
@@ -90,7 +91,7 @@ function AddAiProviderSheet({
 
   const submitDisabled =
     submitting ||
-    !consented ||
+    (!isApple && !consented) ||
     model.trim() === '' ||
     (apiKeyRequired && apiKey.trim() === '') ||
     (isOpenAICompatible && baseUrl.trim() === '')
@@ -99,10 +100,11 @@ function AddAiProviderSheet({
     <>
       <DrawerTitle>Add AI provider</DrawerTitle>
       <DrawerBody>
-        <p className="text-sm text-text-muted">
-          The API key is stored in this device’s keychain, never in your graph — add it on each
-          device you chat from.
-        </p>
+        {!isApple ? (
+          <p className="text-sm text-text-muted">
+            Your API key is stored in this device's keychain. Add it on each device you chat from.
+          </p>
+        ) : null}
 
         <div className="flex flex-col gap-1">
           <span className={FIELD_LABEL_CLASS}>Provider</span>
@@ -200,28 +202,37 @@ function AddAiProviderSheet({
           </label>
         ) : null}
 
-        <label className="flex flex-col gap-1">
-          <span className={FIELD_LABEL_CLASS}>
-            {apiKeyRequired ? 'API key' : 'API key (optional)'}
-          </span>
-          <Input
-            type="password"
-            placeholder={provider.keyPlaceholder}
-            autoComplete="off"
-            spellCheck={false}
-            value={apiKey}
-            onChange={(event) => {
-              setApiKey(event.target.value)
-              resetUnverified()
-            }}
-          />
-        </label>
+        {isApple ? (
+          <p className="text-sm text-text-muted">
+            No API key. Runs on this device with Apple Intelligence enabled. Requires macOS 26.4 or
+            iOS 26.4 or later. Best for short questions about a few notes.
+          </p>
+        ) : (
+          <label className="flex flex-col gap-1">
+            <span className={FIELD_LABEL_CLASS}>
+              {apiKeyRequired ? 'API key' : 'API key (optional)'}
+            </span>
+            <Input
+              type="password"
+              placeholder={provider.keyPlaceholder}
+              autoComplete="off"
+              spellCheck={false}
+              value={apiKey}
+              onChange={(event) => {
+                setApiKey(event.target.value)
+                resetUnverified()
+              }}
+            />
+          </label>
+        )}
 
-        <AiProviderConsent
-          provider={provider}
-          consented={consented}
-          onConsentedChange={setConsented}
-        />
+        {!isApple ? (
+          <AiProviderConsent
+            provider={provider}
+            consented={consented}
+            onConsentedChange={setConsented}
+          />
+        ) : null}
 
         <label className="flex items-center gap-2 py-1">
           <input

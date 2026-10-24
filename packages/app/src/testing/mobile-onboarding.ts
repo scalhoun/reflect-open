@@ -77,6 +77,10 @@ class TestMobileOnboardingServiceImpl implements TestMobileOnboardingService {
     return this.#inner.completeOnboarding(kind, root)
   }
 
+  chooseFolder(): Promise<void> {
+    return this.#inner.chooseFolder()
+  }
+
   setState(patch: Partial<MobileOnboardingState>): void {
     this.#overlay = { ...this.#overlay, ...patch }
     for (const listener of this.#listeners) {
