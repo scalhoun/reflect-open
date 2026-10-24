@@ -40,7 +40,7 @@ export interface MobileAudioMemoSessionState {
    */
   readonly available: boolean
   /**
-   * False when no OpenAI/Gemini model is configured; the drawer then guides key setup.
+   * False when no transcription engine is configured; the drawer then guides setup.
    */
   readonly hasTranscriptionConfig: boolean
   /**

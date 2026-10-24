@@ -14,6 +14,7 @@
 //! [`menu`] (the macOS app menu, incl. Paste and Match Style),
 //! [`error`] (the shared error contract).
 
+mod apple_speech;
 mod background_task;
 mod blocking;
 mod calendar;
@@ -272,6 +273,8 @@ pub fn run() {
             fs::x_archive::x_archive_owners,
             fs::x_syndication::x_syndication_fetch,
             app_version,
+            apple_speech::apple_speech_status,
+            apple_speech::apple_speech_transcribe,
             background_task::background_task_begin,
             background_task::background_task_end,
             icloud::storage::mobile_storage,

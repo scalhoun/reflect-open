@@ -220,6 +220,16 @@ export const describeAssetsSchema = z.boolean().catch(true)
 export const transcriptionFormatSchema = z.boolean().catch(true)
 
 /**
+ * The audio memo engine. Apple keeps audio and transcripts on the device.
+ */
+export const transcriptionEngineSchema = z.enum(['cloud', 'apple']).catch('cloud')
+
+/**
+ * The spoken language used by Apple's on-device recognizer.
+ */
+export const transcriptionLanguageSchema = z.string().trim().min(1).max(64).catch('en-US')
+
+/**
  * Maximum stored transcription hint. `whisper-1` (the OpenAI fallback model)
  * reads only the last 224 prompt tokens, so a longer hint would be cut from
  * the front.
@@ -534,6 +544,8 @@ export const settingsSchema = z.looseObject({
   semanticSearchEnabled: semanticSearchEnabledSchema,
   describeAssets: describeAssetsSchema,
   transcriptionFormat: transcriptionFormatSchema,
+  transcriptionEngine: transcriptionEngineSchema,
+  transcriptionLanguage: transcriptionLanguageSchema,
   transcriptionPrompt: transcriptionPromptSchema,
   contactsEnabled: contactsEnabledSchema,
   mobileOnboarded: mobileOnboardedSchema,

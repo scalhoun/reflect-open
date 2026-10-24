@@ -4,9 +4,11 @@ import { createTestIpcBridgeService } from '../testing/ipc.ts'
 import { createTestLoggerService } from '../testing/logger.ts'
 import { createTestPlatformService, type TestPlatformOptions } from '../testing/platform.ts'
 import { createPlatformAudioRecorder } from './platform-audio-recorder.ts'
+import { createTestSettingsService } from '../testing/settings.ts'
 
 function recorderOn(platform: TestPlatformOptions) {
   return createPlatformAudioRecorder({
+    settings: createTestSettingsService(),
     platform: createTestPlatformService(platform),
     ipc: createTestIpcBridgeService(),
     clock: createTestClockService(),

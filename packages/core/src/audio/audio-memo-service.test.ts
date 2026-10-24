@@ -183,6 +183,21 @@ describe('AudioMemoPipeline.listSegments', () => {
   })
 })
 
+describe('Apple recording configuration', () => {
+  it('enables recording immediately when Apple is selected without a cloud model or key', async () => {
+    const kit = await openSession({ providers: { providers: [], defaultProviderId: null } })
+    expect(kit.session.getState().available).toBe(false)
+
+    kit.settings.update({ transcriptionEngine: 'apple' })
+    expect(kit.session.getState().available).toBe(true)
+    kit.session.toggle()
+    await flush()
+    expect(kit.session.getState().phase).toBe('recording')
+
+    kit.session.dispose()
+  })
+})
+
 describe('AudioMemoService.openPipeline', () => {
   it('throws when no graph is open', async () => {
     const { service, graphSession } = await setup()

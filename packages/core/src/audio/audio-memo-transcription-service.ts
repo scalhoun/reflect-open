@@ -240,8 +240,9 @@ function recordingLinks(session: AudioMemoSession): string {
 
 interface TranscribeSessionPartsInput {
   session: AudioMemoSession
-  provider: TranscriptionProvider
+  provider: TranscriptionProvider | 'apple'
   apiKey: string
+  language: string
   /**
    * User transcription hint, if any.
    */
@@ -389,7 +390,10 @@ class AudioMemoTranscriptionSessionImpl implements AudioMemoTranscriptionSession
     const { aiProviderConfig, settings, reconcile } = this.#deps
     // Gate before any IO: without a transcription-capable model every pass
     // would list the graph just to stop on `config`.
-    if (aiProviderConfig.transcriptionConfig() === null) {
+    if (
+      settings.get().transcriptionEngine !== 'apple' &&
+      aiProviderConfig.transcriptionConfig() === null
+    ) {
       return
     }
     // The settings are read at the start of every pass rather than captured
@@ -444,9 +448,11 @@ class AudioMemoTranscriptionServiceImpl implements AudioMemoTranscriptionService
     // Re-resolved on every pass (not once at record time): a pass after the
     // user fixes their model configuration must see the fix. Keys are read at
     // most once per entry per pass.
-    const target = await aiProviderConfig.resolveTranscriptionTarget(
-      aiCredentials.createPassReader(),
-    )
+    const current = this.#deps.settings.get()
+    const target =
+      current.transcriptionEngine === 'apple'
+        ? { config: null, apiKey: '' }
+        : await aiProviderConfig.resolveTranscriptionTarget(aiCredentials.createPassReader())
     if (target === 'no-provider') {
       return {
         pending: sessions.length,
@@ -468,14 +474,14 @@ class AudioMemoTranscriptionServiceImpl implements AudioMemoTranscriptionService
       }
     }
     const { config, apiKey } = target
-    const enrichmentConfig = aiProviderConfig.audioMemoEnrichmentConfig()
+    const enrichmentConfig = config === null ? null : aiProviderConfig.audioMemoEnrichmentConfig()
     const enrichmentApiKey =
       enrichmentConfig === null
         ? null
-        : enrichmentConfig.id === config.id
+        : enrichmentConfig.id === config?.id
           ? apiKey
           : await aiCredentials.read(enrichmentConfig).catch(() => null)
-    const fallbackEnrichmentConfig = audioMemoEnrichmentConfig(config)
+    const fallbackEnrichmentConfig = config === null ? null : audioMemoEnrichmentConfig(config)
     const enrichmentCredentials: AudioMemoEnrichmentCredentials | null =
       enrichmentConfig !== null && enrichmentApiKey !== null
         ? { config: enrichmentConfig, apiKey: enrichmentApiKey }
@@ -506,7 +512,7 @@ class AudioMemoTranscriptionServiceImpl implements AudioMemoTranscriptionService
       }
       const memo = session.memo
       try {
-        const sessionTranscript = transcription.sessionTranscript(apiKey)
+        const sessionTranscript = config === null ? null : transcription.sessionTranscript(apiKey)
         if (sessionTranscript !== null) {
           // A whole-session transcript (the App Review demo) — no provider
           // calls, no per-segment cache.
@@ -528,8 +534,9 @@ class AudioMemoTranscriptionServiceImpl implements AudioMemoTranscriptionService
         }
         const parts = await this.#transcribeSessionParts({
           session,
-          provider: config.provider,
+          provider: config?.provider ?? 'apple',
           apiKey,
+          language: current.transcriptionLanguage,
           prompt: input.transcriptionPrompt,
           generation: input.generation,
           isStale: stale,
@@ -768,7 +775,7 @@ class AudioMemoTranscriptionServiceImpl implements AudioMemoTranscriptionService
       if (part.placeholder) {
         return { status: 'partial' }
       }
-      if (part.sizeBytes > TRANSCRIPTION_MAX_SEGMENT_BYTES) {
+      if (input.provider !== 'apple' && part.sizeBytes > TRANSCRIPTION_MAX_SEGMENT_BYTES) {
         return { status: 'oversize' }
       }
       if (part.sizeBytes === 0) {
@@ -778,20 +785,27 @@ class AudioMemoTranscriptionServiceImpl implements AudioMemoTranscriptionService
         results.push({ text: '' })
         continue
       }
-      const bytes = await assetStore.readBytes(part.path, input.generation)
-      if (input.isStale()) {
-        return { status: 'stale' }
-      }
       let result: AudioMemoPartResult
       try {
-        const text = await transcription.transcribe({
-          provider: input.provider,
-          apiKey: input.apiKey,
-          prompt: input.prompt,
-          audio: new Blob([bytes], { type: part.memo.mimeType }),
-          mimeType: part.memo.mimeType,
-          isStale: input.isStale,
-        })
+        let text: string
+        if (input.provider === 'apple') {
+          text = await transcription.transcribeApple({
+            path: part.path,
+            generation: input.generation,
+            locale: input.language,
+          })
+        } else {
+          const bytes = await assetStore.readBytes(part.path, input.generation)
+          if (input.isStale()) return { status: 'stale' }
+          text = await transcription.transcribe({
+            provider: input.provider,
+            apiKey: input.apiKey,
+            prompt: input.prompt,
+            audio: new Blob([bytes], { type: part.memo.mimeType }),
+            mimeType: part.memo.mimeType,
+            isStale: input.isStale,
+          })
+        }
         result = { text }
       } catch (cause) {
         if (isTranscriptionOversize(cause)) {

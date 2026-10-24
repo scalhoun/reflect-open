@@ -25,7 +25,16 @@ disk at call time), and it is covered by tests.
   identify note content you manually paste into a message or the configured prompt.
 - **When:** only while you use chat (⌘J). No background calls.
 
-## Audio memos (off until you add a key)
+## Audio memos
+
+Choose the transcription engine in Settings → Audio memos. Apple on-device
+transcription requires macOS 26 or iOS 26 and supported hardware and language.
+It needs no API key. Audio is processed locally, titles are derived locally,
+and no transcript is sent for cloud formatting or title generation, even if
+cloud AI providers are configured. Missing language models download from Apple.
+Recordings and transcripts still follow your normal graph backup and sync settings.
+
+With OpenAI / Google selected, recording requires a configured provider:
 
 - **Where:** directly to your configured providers. OpenAI or Google receives the
   recording for speech-to-text. A small text model from your configured OpenAI,
@@ -161,7 +170,8 @@ API keys and tokens live in the **OS keychain only** — never in markdown, neve
 | Call | Destination | Carries note content? | Off by default? |
 | --- | --- | --- | --- |
 | AI chat | Your chosen provider | Yes — private-note tool reads are blocked | Yes (needs your key) |
-| Audio transcription | Your chosen providers | No existing note content; audio and its fresh transcript | Yes (needs your key) |
+| Apple audio transcription | On-device; Apple for language-model downloads | No audio or transcript sent for processing | Yes (select Apple in Settings) |
+| Cloud audio transcription | Your chosen providers | No existing note content; audio and its fresh transcript | Yes (needs your key) |
 | Embeddings | Nowhere (on-device) | — | Yes (opt-in download) |
 | Model download | Hugging Face | No | Yes (opt-in) |
 | Backup | Your git repository | Yes — including private notes | Yes (needs connecting) |

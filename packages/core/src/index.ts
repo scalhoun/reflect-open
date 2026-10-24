@@ -16,6 +16,7 @@ export {
   type IpcBridgeService,
 } from './ipc/ipc-service.ts'
 export type { Unlisten } from './unlisten.ts'
+export type { AppleSpeechStatus } from './ai/transcription-service.ts'
 
 export { type HapticsService } from './ipc/haptics-service.ts'
 export { type AudioRecorderFinalSegment } from './audio/audio-recorder-service.ts'
@@ -244,6 +245,8 @@ export {
   clampSidebarWidth,
   TRANSCRIPTION_PROMPT_MAX_LENGTH,
   normalizeTranscriptionPrompt,
+  transcriptionEngineSchema,
+  transcriptionLanguageSchema,
   timeFormatSchema,
   dateFormatSchema,
   weekStartDaySchema,

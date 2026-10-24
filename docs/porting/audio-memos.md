@@ -11,8 +11,15 @@ note. Transcription capacity was part of the paid plan.
 
 ## How v2 does it
 
-Recording is local and transcription is bring-your-own-key — no audio ever
-touches a Reflect server, because there isn't one.
+Recording is local. Transcription uses either Apple's on-device speech model
+or the user's OpenAI/Google key. No audio touches a Reflect server.
+
+Settings → Audio memos selects the engine and, for Apple, the spoken language.
+Apple needs macOS 26 or iOS 26 and a supported device and language. Missing
+models download on first use. Apple mode transcribes saved files natively,
+uses local titles, and skips cloud formatting and title generation entirely.
+The desktop recorder requests AAC/M4A in Apple mode. WebKit can also record
+WebM/Opus, but Apple's audio-file reader cannot open those recordings.
 
 - **Entry point.** The microphone control in the sidebar, with a global
   shortcut (`mod+\`). Lifecycle lives in
@@ -51,8 +58,8 @@ touches a Reflect server, because there isn't one.
   transcript note, resolves or creates the `Audio memos` category note, and
   backlinks both from the daily note under `## [[Audio memos]]`. Pending memos
   retry in the background.
-- **No key configured.** The mic button is disabled with a tooltip pointing
-  at Settings — there is no metered fallback tier to fall back to.
+- **No key configured.** Apple mode enables recording without a key. Cloud
+  mode disables the mic button with a tooltip pointing at Settings.
 
 ## v1 → v2 mapping
 

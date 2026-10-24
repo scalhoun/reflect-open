@@ -1,5 +1,6 @@
 import type { ClockService, TimerHandle } from '../ports/clock-service.ts'
 import type { Unlisten } from '../unlisten.ts'
+import type { SettingsService } from '../settings/settings-service.ts'
 import type {
   RecordingLevelEvent,
   RecordingSessionStart,
@@ -43,12 +44,11 @@ export interface WebMediaDevices {
 }
 
 /**
- * Preference order matters per platform: Chrome and WebView2 take the
- * opus-in-webm entries; WKWebView supports none of them and falls through to
- * `audio/mp4` (AAC). Both containers are accepted by the transcription
- * providers.
+ * Cloud providers accept WebM. Apple's AVAudioFile cannot read it, even on
+ * WebKit versions that record WebM/Opus, so local transcription requires AAC.
  */
 const MIME_CANDIDATES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4']
+const APPLE_MIME_CANDIDATES = ['audio/mp4;codecs=mp4a.40.2', 'audio/mp4']
 
 /**
  * Speech-quality encode target. Left to its defaults, MediaRecorder picks
@@ -102,6 +102,7 @@ function emit<Value>(listeners: Set<(value: Value) => void>, value: Value): void
 
 export interface WebAudioRecorderDeps {
   readonly clock: ClockService
+  readonly settings: SettingsService
   readonly mediaDevices?: WebMediaDevices
   readonly MediaRecorder?: WebMediaRecorderConstructor
 }
@@ -372,13 +373,15 @@ class WebAudioRecorderImpl implements AudioRecorderService {
 
   #pickMimeType(): string | undefined {
     const MediaRecorderClass = this.#recorderClass()
-    return MIME_CANDIDATES.find(
-      (candidate) => MediaRecorderClass?.isTypeSupported(candidate) ?? false,
-    )
+    const candidates =
+      this.#deps.settings.get().transcriptionEngine === 'apple'
+        ? APPLE_MIME_CANDIDATES
+        : MIME_CANDIDATES
+    return candidates.find((candidate) => MediaRecorderClass?.isTypeSupported(candidate) ?? false)
   }
 
   #mimeOf(current: WebMediaRecorder): string {
-    return current.mimeType || this.#pickMimeType() || FALLBACK_MIME_TYPE
+    return current.mimeType || this.#recorderInit.mimeType || FALLBACK_MIME_TYPE
   }
 
   #stopTracks(stream: MediaStream): void {
